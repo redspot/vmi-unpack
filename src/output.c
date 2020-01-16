@@ -431,28 +431,24 @@ int volatility_impscan(vmi_instance_t vmi, pid_events_t *pid_event, addr_t base_
     //  call impscan(eprocess, imagebase + section_rva, size)
     for (s=0; s < num_sections; s++) {
       fprintf(stderr, "%s: section=%d\n", __func__, s);
-      if (section_table[s].characteristics & IMAGE_SCN_MEM_EXECUTE) {
-        addr_t section_rva = section_table[s].virtual_address;
-        size_t section_size = section_table[s].a.virtual_size;
-        if (section_size == 0) {
-          addr_t next_sec_rva;
-          if (s == num_sections - 1)
-            next_sec_rva = pid_event->vad_pe_size;
-          else
-            next_sec_rva = section_table[s+1].virtual_address;
-          section_size = next_sec_rva - section_rva;
-        }
-        snprintf(filepath, PATH_MAX - 1, "%s/impscan.section%04d.%04d.%ld.json",
-            output_dir, s, count, (long)pid_event->pid);
-        snprintf(cmd, cmd_max - 1, impscan_cmd,
+      addr_t section_rva = section_table[s].virtual_address;
+      size_t section_size = section_table[s].a.virtual_size;
+      if (section_size == 0) {
+        addr_t next_sec_rva;
+        if (s == num_sections - 1)
+          next_sec_rva = pid_event->vad_pe_size;
+        else
+          next_sec_rva = section_table[s+1].virtual_address;
+        section_size = next_sec_rva - section_rva;
+      }
+      snprintf(filepath, PATH_MAX - 1, "%s/impscan.section%04d.%04d.%ld.json",
+          output_dir, s, count, (long)pid_event->pid);
+      snprintf(cmd, cmd_max - 1, impscan_cmd,
           cmd_prefix, domain_name, vol_profile,
           base_va + section_rva, section_size,
           filepath, (long)pid_event->pid);
-        fprintf(stderr, "%s: cmd=%s\n", __func__, cmd);
-        queue_and_wait_for_shell_cmd(cmd, devnull_path);
-      }
-      else
-        fprintf(stderr, "%s: section=%d is not EXECUTE\n", __func__, s);
+      fprintf(stderr, "%s: cmd=%s\n", __func__, cmd);
+      queue_and_wait_for_shell_cmd(cmd, devnull_path);
     }
 
     free(cmd);
