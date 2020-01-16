@@ -167,6 +167,22 @@ typedef struct
 #define trace_trap(addr, trap, mesg)
 #endif
 
+#define TRACE_EXEC_TRAP
+
+#ifdef TRACE_EXEC_TRAP
+#define trace_exec_trap(mesg, pid, base_va, paddr, pid_evt, wx_map, exec_map) \
+    fprintf(stderr, \
+    "%s:trace_exec_map %s\n" \
+    "%s:trace_exec_map pid=%d base_va=0x%lx paddr=0x%lx\n" \
+    "%s:trace_exec_map pid_events=%p write_exec_map=%p exec_map=%p\n" \
+    , __func__, mesg, \
+    __func__, pid, base_va, paddr, \
+    __func__, pid_evt, wx_map, exec_map \
+    )
+#else
+#define trace_exec_trap(mesg, pid, base_va, paddr, pid_evt, wx_map, exec_map)
+#endif
+
 typedef struct
 {
     vmi_pid_t pid;
