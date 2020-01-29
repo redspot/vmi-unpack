@@ -277,14 +277,19 @@ void monitor_trap_vma(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid, mem
         if (!g_hash_table_contains(exec_map, (gpointer)event->mem_event.gfn))
         {
             addr_t paddr = PADDR_SHIFT(event->mem_event.gfn);
+            page_cat_t cat = PAGE_CAT_4KB_FRAME;
             trace_exec_trap("ADDED new exec_map for pid",
                 pid, vma.base_va, paddr,
                 my_pid_events, my_pid_events->write_exec_map, exec_map);
+            //trapped_pages key is full physical address
             trapped_page_t *trap = g_hash_table_lookup(trapped_pages, (gpointer)paddr);
+            if (trap)
+              cat = trap->cat;
+            //exec_map key is GFN
             g_hash_table_add(exec_map, (gpointer)event->mem_event.gfn);
             // if an instruction writes to the page that it is in,
             // step past it then put the VMI_MEMACCESS_X on the page
-            if (rip_in_page(event->x86_regs->rip, event->mem_event.gla, trap->cat))
+            if (rip_in_page(event->x86_regs->rip, event->mem_event.gla, cat))
             {
               vmi_set_mem_event(vmi, event->mem_event.gfn, VMI_MEMACCESS_N, 0);
               vmi_step_event(vmi, event, event->vcpu_id, 1, write_retrap);
