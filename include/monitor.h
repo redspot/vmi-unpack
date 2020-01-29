@@ -160,6 +160,8 @@ typedef struct
     addr_t vaddr;
 } trapped_page_t;
 
+//#define TRACE_TRAPS
+
 #ifdef TRACE_TRAPS
 #define trace_trap(addr, trap, mesg) fprintf(stderr, \
         "%s:trace_trap paddr=%p vaddr=%p pid=%d cat=%s mesg=%s\n", \
@@ -168,7 +170,7 @@ typedef struct
 #define trace_trap(addr, trap, mesg)
 #endif
 
-#define TRACE_EXEC_TRAP
+//#define TRACE_EXEC_TRAP
 
 #ifdef TRACE_EXEC_TRAP
 #define trace_exec_trap(mesg, pid, base_va, paddr, vaddr, pid_evt, wx_map, exec_map) \
@@ -182,6 +184,46 @@ typedef struct
     )
 #else
 #define trace_exec_trap(...)
+#endif
+
+#define TRACE_STUFF
+//#define TRACE_UNTRAP_VMA
+//#define TRACE_TRAP_VMA
+//#define TRACE_EXEC
+//#define TRACE_WRITE
+
+#ifdef TRACE_STUFF
+#define trace(fmt, ...) \
+    fprintf(stderr, \
+    "%s[%d]:"#fmt"\n" \
+    , __func__, __LINE__, ##__VA_ARGS__ \
+    )
+#else
+#define trace(...)
+#endif
+
+#if defined (TRACE_STUFF) && defined(TRACE_UNTRAP_VMA)
+#define trace_untrap_vma(args...) trace(args)
+#else
+#define trace_untrap_vma(args...)
+#endif
+
+#if defined (TRACE_STUFF) && defined(TRACE_TRAP_VMA)
+#define trace_trap_vma(args...) trace(args)
+#else
+#define trace_trap_vma(args...)
+#endif
+
+#if defined (TRACE_STUFF) && defined(TRACE_EXEC)
+#define trace_exec(args...) trace(args)
+#else
+#define trace_exec(args...)
+#endif
+
+#if defined (TRACE_STUFF) && defined(TRACE_WRITE)
+#define trace_write(args...) trace(args)
+#else
+#define trace_write(args...)
 #endif
 
 typedef struct
