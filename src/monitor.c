@@ -229,7 +229,7 @@ void monitor_untrap_vma(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid, m
     if (!exec_map)
     {
         trace_exec_trap("WARNING - Could not find exec_map for pid",
-            pid, vma.base_va, paddr,
+            pid, vma.base_va, paddr, vaddr,
             my_pid_events, my_pid_events->write_exec_map, exec_map);
         vmi_set_mem_event(vmi, event->mem_event.gfn, VMI_MEMACCESS_N, 0);
         return;
@@ -284,7 +284,7 @@ void monitor_trap_vma(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid, mem
         {
             page_cat_t cat = PAGE_CAT_4KB_FRAME;
             trace_exec_trap("ADDED new exec_map for pid",
-                pid, vma.base_va, paddr,
+                pid, vma.base_va, paddr, vaddr,
                 my_pid_events, my_pid_events->write_exec_map, exec_map);
             //trapped_pages key is full physical address
             trapped_page_t *trap = g_hash_table_lookup(trapped_pages, (gpointer)paddr);
