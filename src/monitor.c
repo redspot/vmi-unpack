@@ -234,8 +234,8 @@ void monitor_untrap_vma(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid, m
         vmi_set_mem_event(vmi, event->mem_event.gfn, VMI_MEMACCESS_N, 0);
         return;
     }
-    fprintf(stderr, "monitor_untrap_vma: pid=%d, base_va=0x%lx, paddr=0x%lx\n",
-            pid, vma.base_va, paddr);
+    trace_untrap_vma("pid=%d, base_va=0x%lx, paddr=0x%lx, vaddr=0x%lx\n",
+            pid, vma.base_va, paddr, vaddr);
     page_cat_t cat = PAGE_CAT_4KB_FRAME;
     trapped_page_t *trap = g_hash_table_lookup(trapped_pages, (gpointer)paddr);
     if (trap)
@@ -244,11 +244,14 @@ void monitor_untrap_vma(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid, m
     // step past it then put the VMI_MEMACCESS_W on the page
     if (rip_in_page(event->x86_regs->rip, vaddr, cat))
     {
+      trace_untrap_vma("removing X: rip(0x%lx) is in page(0x%lx) cat=%s",
+          event->x86_regs->rip, vaddr, cat2str(cat));
       vmi_set_mem_event(vmi, event->mem_event.gfn, VMI_MEMACCESS_N, 0);
       vmi_step_event(vmi, event, event->vcpu_id, 1, exec_retrap);
     }
     else
     {
+      trace_untrap_vma("removing X: pid=%d, paddr=0x%lx, vaddr=0x%lx", pid, paddr, vaddr);
       vmi_set_mem_event(vmi, event->mem_event.gfn, VMI_MEMACCESS_W, 0);
     }
     g_hash_table_remove(exec_map, (gpointer)event->mem_event.gfn);
@@ -298,6 +301,8 @@ void monitor_trap_vma(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid, mem
             // step past it then put the VMI_MEMACCESS_X on the page
             if (rip_in_page(event->x86_regs->rip, vaddr, cat))
             {
+              trace_trap_vma("adding X: rip(0x%lx) is in page(0x%lx) cat=%s",
+                  event->x86_regs->rip, vaddr, cat2str(cat));
               vmi_set_mem_event(vmi, event->mem_event.gfn, VMI_MEMACCESS_N, 0);
               vmi_step_event(vmi, event, event->vcpu_id, 1, write_retrap);
             }
@@ -818,12 +823,14 @@ after_not_found:
                 if (addr_in_range(event->x86_regs->rip, my_pid_events->vad_pe_start, my_pid_events->vad_pe_size)
                     )
                     my_pid_events->cb(vmi, event, pid, trap->cat);
-                else { }
-            else { }
+                else { trace_exec("VMI_MEMACCESS_X: address not in range: rip=0x%lx", event->x86_regs->rip); }
+            else { trace_exec("VMI_MEMACCESS_X: address not below HIGH_ADDR_MARK: rip=0x%lx", event->x86_regs->rip); }
+            trace_exec("calling monitor_untrap_vma:VMI_MEMACCESS_X: rip=0x%lx", event->x86_regs->rip);
             monitor_untrap_vma(vmi, event, pid, vma);
         }
         else if (event->mem_event.out_access & VMI_MEMACCESS_W)
         {
+            trace_write("calling monitor_trap_vma:VMI_MEMACCESS_W: rip=0x%lx", event->x86_regs->rip);
             monitor_trap_vma(vmi, event, pid, vma);
         }
         else
