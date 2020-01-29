@@ -89,6 +89,32 @@ static inline int addr_in_range(addr_t suspect, addr_t start, size_t size)
   return (suspect >= start && suspect < (start + size));
 }
 
+static inline int rip_in_page(addr_t rip, addr_t vaddr, page_cat_t cat)
+{
+    size_t size = 0;
+    addr_t page = vaddr & VMI_BIT_MASK(12, 63);
+    switch (cat)
+    {
+        case PAGE_CAT_NOT_SET:
+        case PAGE_CAT_PML4:
+        case PAGE_CAT_PDPT:
+        case PAGE_CAT_PD:
+        case PAGE_CAT_PT:
+            return 0; // userspace instructions cannot be in pagetable or unknown pages
+            break;
+        case PAGE_CAT_4KB_FRAME:
+            size = 4 * 1024;
+            break;
+        case PAGE_CAT_2MB_FRAME:
+            size = 2 * 1024 * 1024;
+            break;
+        case PAGE_CAT_1GB_FRAME:
+            size = 1 * 1024 * 1024 * 1024;
+            break;
+    }
+    return addr_in_range(rip, page, size);
+}
+
 // maintain global trapped_pages hash and set memory traps
 void monitor_set_trap(vmi_instance_t vmi, addr_t paddr, vmi_mem_access_t access, vmi_pid_t pid, page_cat_t cat)
 {
@@ -157,6 +183,22 @@ event_response_t cr3_retrap(vmi_instance_t vmi, vmi_event_t *event)
         cb_data.list = &pending_page_retrap;
         g_slist_foreach(pending_page_retrap, process_pending_rescan, &cb_data);
     }
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+// called in monitor_trap_vma to trap after a write trap.
+// this is needed when an instruction writes to the page that it is in.
+event_response_t write_retrap(vmi_instance_t vmi, vmi_event_t *event)
+{
+    vmi_set_mem_event(vmi, event->mem_event.gfn, VMI_MEMACCESS_X, 0);
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+// called in monitor_untrap_vma to trap after an exec trap.
+// this is needed when an instruction writes to the page that it is in.
+event_response_t exec_retrap(vmi_instance_t vmi, vmi_event_t *event)
+{
+    vmi_set_mem_event(vmi, event->mem_event.gfn, VMI_MEMACCESS_W, 0);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
