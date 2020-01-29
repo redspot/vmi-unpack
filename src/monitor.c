@@ -208,10 +208,12 @@ void monitor_untrap_vma(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid, m
 {
     GHashTable *exec_map;
     pid_events_t *my_pid_events;
+    addr_t paddr = PADDR_SHIFT(event->mem_event.gfn);
+    addr_t vaddr = event->mem_event.gla;
 
     if (!vma.size)
     {
-        fprintf(stderr, "WARNING: monitor_untrap_vma - Could not find VMA for virtual address 0x%lx\n", event->mem_event.gla);
+        fprintf(stderr, "WARNING: monitor_untrap_vma - Could not find VMA for virtual address 0x%lx\n", vaddr);
         return;
     }
 
@@ -225,20 +227,20 @@ void monitor_untrap_vma(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid, m
     if (!exec_map)
     {
         trace_exec_trap("WARNING - Could not find exec_map for pid",
-            pid, vma.base_va, PADDR_SHIFT(event->mem_event.gfn),
+            pid, vma.base_va, paddr,
             my_pid_events, my_pid_events->write_exec_map, exec_map);
         vmi_set_mem_event(vmi, event->mem_event.gfn, VMI_MEMACCESS_N, 0);
         return;
     }
     fprintf(stderr, "monitor_untrap_vma: pid=%d, base_va=0x%lx, paddr=0x%lx\n",
-            pid, vma.base_va, PADDR_SHIFT(event->mem_event.gfn));
+            pid, vma.base_va, paddr);
     page_cat_t cat = PAGE_CAT_4KB_FRAME;
     trapped_page_t *trap = g_hash_table_lookup(trapped_pages, (gpointer)event->mem_event.gfn);
     if (trap)
       cat = trap->cat;
     // if an instruction writes to the page that it is in,
     // step past it then put the VMI_MEMACCESS_W on the page
-    if (rip_in_page(event->x86_regs->rip, event->mem_event.gla, cat))
+    if (rip_in_page(event->x86_regs->rip, vaddr, cat))
     {
       vmi_set_mem_event(vmi, event->mem_event.gfn, VMI_MEMACCESS_N, 0);
       vmi_step_event(vmi, event, event->vcpu_id, 1, exec_retrap);
@@ -254,10 +256,12 @@ void monitor_untrap_vma(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid, m
 // "execute" trap on that page with VMI_MEMACCESS_X
 void monitor_trap_vma(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid, mem_seg_t vma)
 {
+    addr_t paddr = PADDR_SHIFT(event->mem_event.gfn);
+    addr_t vaddr = event->mem_event.gla;
     if (!vma.size)
     {
         fprintf(stderr, "WARNING:%s-Could not find VMA: vaddr=0x%lx paddr=0x%lx\n",
-                __FUNCTION__, event->mem_event.gla, PADDR_SHIFT(event->mem_event.gfn));
+                __FUNCTION__, vaddr, paddr);
         return;
     }
     if (vma.base_va >= KERNEL_MARK)
@@ -276,7 +280,6 @@ void monitor_trap_vma(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid, mem
         }
         if (!g_hash_table_contains(exec_map, (gpointer)event->mem_event.gfn))
         {
-            addr_t paddr = PADDR_SHIFT(event->mem_event.gfn);
             page_cat_t cat = PAGE_CAT_4KB_FRAME;
             trace_exec_trap("ADDED new exec_map for pid",
                 pid, vma.base_va, paddr,
@@ -289,7 +292,7 @@ void monitor_trap_vma(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid, mem
             g_hash_table_add(exec_map, (gpointer)event->mem_event.gfn);
             // if an instruction writes to the page that it is in,
             // step past it then put the VMI_MEMACCESS_X on the page
-            if (rip_in_page(event->x86_regs->rip, event->mem_event.gla, cat))
+            if (rip_in_page(event->x86_regs->rip, vaddr, cat))
             {
               vmi_set_mem_event(vmi, event->mem_event.gfn, VMI_MEMACCESS_N, 0);
               vmi_step_event(vmi, event, event->vcpu_id, 1, write_retrap);
