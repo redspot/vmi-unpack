@@ -25,7 +25,7 @@ def find_orig_exe(fn, vads, glob_tmpl='{}.????????.0x{:016x}-0x{:016x}.dmp'):
     exe_fn = None
     for vad in vads:
         if fn in vad['FileNameWithDevice']:
-            exe_fn = glob_tmpl.format(fn, vad['Start'], vad['End'])
+            exe_fn = glob_tmpl.format(fn[:14], vad['Start'], vad['End'])
             break
     return exe_fn
 
