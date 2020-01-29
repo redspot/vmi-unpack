@@ -283,7 +283,9 @@ void monitor_trap_vma(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid, mem
         if (!g_hash_table_contains(exec_map, (gpointer)event->mem_event.gfn))
         {
             page_cat_t cat = PAGE_CAT_4KB_FRAME;
-            trace_exec_trap("ADDED new exec_map for pid",
+            char mesg[80] = {0};
+            snprintf(mesg, 80, "ADDED new exec_map for pid: rip=0x%lx", event->x86_regs->rip);
+            trace_exec_trap(mesg,
                 pid, vma.base_va, paddr, vaddr,
                 my_pid_events, my_pid_events->write_exec_map, exec_map);
             //trapped_pages key is full physical address
