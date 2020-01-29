@@ -157,12 +157,13 @@ typedef struct
 {
     vmi_pid_t pid;
     page_cat_t cat;
+    addr_t vaddr;
 } trapped_page_t;
 
 #ifdef TRACE_TRAPS
 #define trace_trap(addr, trap, mesg) fprintf(stderr, \
-        "%s:trace_trap paddr=%p pid=%d cat=%s mesg=%s\n", \
-        __FUNCTION__, (gpointer)addr, trap->pid, cat2str(trap->cat), mesg)
+        "%s:trace_trap paddr=%p vaddr=%p pid=%d cat=%s mesg=%s\n", \
+        __FUNCTION__, (gpointer)addr, (gpointer)trap->vaddr, trap->pid, cat2str(trap->cat), mesg)
 #else
 #define trace_trap(addr, trap, mesg)
 #endif

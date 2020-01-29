@@ -116,7 +116,8 @@ static inline int rip_in_page(addr_t rip, addr_t vaddr, page_cat_t cat)
 }
 
 // maintain global trapped_pages hash and set memory traps
-void monitor_set_trap(vmi_instance_t vmi, addr_t paddr, vmi_mem_access_t access, vmi_pid_t pid, page_cat_t cat)
+void monitor_set_trap(vmi_instance_t vmi, addr_t paddr, vmi_mem_access_t access,
+                      vmi_pid_t pid, page_cat_t cat, addr_t vaddr)
 {
     trapped_page_t *trap = g_hash_table_lookup(trapped_pages, (gpointer)paddr);
 
@@ -125,6 +126,7 @@ void monitor_set_trap(vmi_instance_t vmi, addr_t paddr, vmi_mem_access_t access,
         trap = g_slice_new(trapped_page_t);
         trap->pid = pid;
         trap->cat = cat;
+        trap->vaddr = vaddr;
         g_hash_table_insert(trapped_pages, (gpointer)paddr, trap);
         vmi_set_mem_event(vmi, GFN_SHIFT(paddr), access, 0);
         pid_events_t *my_pid_events = g_hash_table_lookup(vmi_events_by_pid, GINT_TO_POINTER(pid));
@@ -337,18 +339,20 @@ pid_events_t *add_new_pid(vmi_pid_t pid)
     return pval;
 }
 
-void monitor_trap_pt(vmi_instance_t vmi, addr_t pt, vmi_pid_t pid)
+void monitor_trap_pt(vmi_instance_t vmi, addr_t pt, vmi_pid_t pid, addr_t pd_vaddr)
 {
     unsigned index;
     addr_t entry_addr;
     uint64_t entry_val;
     addr_t next_addr;
+    addr_t vaddr;
 
-    monitor_set_trap(vmi, pt, VMI_MEMACCESS_W, pid, PAGE_CAT_PT);
+    monitor_set_trap(vmi, pt, VMI_MEMACCESS_W, pid, PAGE_CAT_PT, 0);
 
     for (index = 0; index < PAGING_INTEL_64_MAX_ENTRIES; index++)
     {
         entry_addr = pt + PAGING_INTEL_64_GET_ENTRY_OFFSET(index);
+        vaddr = pd_vaddr | (((addr_t)index) << 12);
         vmi_read_64_pa(vmi, entry_addr, &entry_val);
         if (!PAGING_INTEL_64_IS_PRESENT(entry_val))
             continue;
@@ -356,24 +360,26 @@ void monitor_trap_pt(vmi_instance_t vmi, addr_t pt, vmi_pid_t pid)
         {
             next_addr = PAGING_INTEL_64_GET_4KB_FRAME_PADDR(entry_val);
             if (next_addr <= max_paddr)
-                monitor_set_trap(vmi, next_addr, VMI_MEMACCESS_W, pid, PAGE_CAT_4KB_FRAME);
+                monitor_set_trap(vmi, next_addr, VMI_MEMACCESS_W, pid, PAGE_CAT_4KB_FRAME, vaddr);
             continue;
         }
     }
 }
 
-void monitor_trap_pd(vmi_instance_t vmi, addr_t pd, vmi_pid_t pid)
+void monitor_trap_pd(vmi_instance_t vmi, addr_t pd, vmi_pid_t pid, addr_t pdpt_vaddr)
 {
     unsigned index;
     addr_t entry_addr;
     uint64_t entry_val;
     addr_t next_addr;
+    addr_t vaddr;
 
-    monitor_set_trap(vmi, pd, VMI_MEMACCESS_W, pid, PAGE_CAT_PD);
+    monitor_set_trap(vmi, pd, VMI_MEMACCESS_W, pid, PAGE_CAT_PD, 0);
 
     for (index = 0; index < PAGING_INTEL_64_MAX_ENTRIES; index++)
     {
         entry_addr = pd + PAGING_INTEL_64_GET_ENTRY_OFFSET(index);
+        vaddr = pdpt_vaddr | (((addr_t)index) << 21);
         vmi_read_64_pa(vmi, entry_addr, &entry_val);
         if (!PAGING_INTEL_64_IS_PRESENT(entry_val))
             continue;
@@ -382,31 +388,33 @@ void monitor_trap_pd(vmi_instance_t vmi, addr_t pd, vmi_pid_t pid)
         {
             next_addr = PAGING_INTEL_64_GET_2MB_FRAME_PADDR(entry_val);
             if (next_addr <= max_paddr)
-                monitor_set_trap(vmi, next_addr, VMI_MEMACCESS_W, pid, PAGE_CAT_2MB_FRAME);
+                monitor_set_trap(vmi, next_addr, VMI_MEMACCESS_W, pid, PAGE_CAT_2MB_FRAME, vaddr);
             continue;
         }
         if (!PAGING_INTEL_64_IS_FRAME_PTR(entry_val))
         {
             next_addr = PAGING_INTEL_64_GET_PT_PADDR(entry_val);
             if (next_addr <= max_paddr)
-                monitor_trap_pt(vmi, next_addr, pid);
+                monitor_trap_pt(vmi, next_addr, pid, vaddr);
             continue;
         }
     }
 }
 
-void monitor_trap_pdpt(vmi_instance_t vmi, addr_t pdpt, vmi_pid_t pid)
+void monitor_trap_pdpt(vmi_instance_t vmi, addr_t pdpt, vmi_pid_t pid, addr_t pml4_vaddr)
 {
     unsigned index;
     addr_t entry_addr;
     uint64_t entry_val;
     addr_t next_addr;
+    addr_t vaddr;
 
-    monitor_set_trap(vmi, pdpt, VMI_MEMACCESS_W, pid, PAGE_CAT_PDPT);
+    monitor_set_trap(vmi, pdpt, VMI_MEMACCESS_W, pid, PAGE_CAT_PDPT, 0);
 
     for (index = 0; index < PAGING_INTEL_64_MAX_ENTRIES; index++)
     {
         entry_addr = pdpt + PAGING_INTEL_64_GET_ENTRY_OFFSET(index);
+        vaddr = pml4_vaddr | (((addr_t)index) << 30);
         vmi_read_64_pa(vmi, entry_addr, &entry_val);
         if (!PAGING_INTEL_64_IS_PRESENT(entry_val))
             continue;
@@ -415,14 +423,14 @@ void monitor_trap_pdpt(vmi_instance_t vmi, addr_t pdpt, vmi_pid_t pid)
         {
             next_addr = PAGING_INTEL_64_GET_1GB_FRAME_PADDR(entry_val);
             if (next_addr <= max_paddr)
-                monitor_set_trap(vmi, next_addr, VMI_MEMACCESS_W, pid, PAGE_CAT_1GB_FRAME);
+                monitor_set_trap(vmi, next_addr, VMI_MEMACCESS_W, pid, PAGE_CAT_1GB_FRAME, vaddr);
             continue;
         }
         if (!PAGING_INTEL_64_IS_FRAME_PTR(entry_val))
         {
             next_addr = PAGING_INTEL_64_GET_PD_PADDR(entry_val);
             if (next_addr <= max_paddr)
-                monitor_trap_pd(vmi, next_addr, pid);
+                monitor_trap_pd(vmi, next_addr, pid, vaddr);
             continue;
         }
     }
@@ -434,18 +442,20 @@ void monitor_trap_pml4(vmi_instance_t vmi, addr_t pml4, vmi_pid_t pid)
     addr_t entry_addr;
     uint64_t entry_val;
     addr_t next_addr;
+    addr_t vaddr;
 
-    monitor_set_trap(vmi, pml4, VMI_MEMACCESS_W, pid, PAGE_CAT_PML4);
+    monitor_set_trap(vmi, pml4, VMI_MEMACCESS_W, pid, PAGE_CAT_PML4, 0);
 
     for (index = 0; index < PAGING_INTEL_64_MAX_ENTRIES; index++)
     {
         entry_addr = pml4 + PAGING_INTEL_64_GET_ENTRY_OFFSET(index);
+        vaddr = (((addr_t)index) << 39);
         vmi_read_64_pa(vmi, entry_addr, &entry_val);
         if (!PAGING_INTEL_64_IS_PRESENT(entry_val))
             continue;
         next_addr = PAGING_INTEL_64_GET_PDPT_PADDR(entry_val);
         if (next_addr <= max_paddr)
-            monitor_trap_pdpt(vmi, next_addr, pid);
+            monitor_trap_pdpt(vmi, next_addr, pid, vaddr);
     }
 }
 
@@ -479,6 +489,7 @@ void process_pending_rescan(gpointer data, gpointer user_data)
     pending_rescan_t *rescan = (pending_rescan_t *) data;
     foreach_data_t *rescan_data = (foreach_data_t *) user_data;
     vmi_instance_t vmi = rescan_data->vmi;
+    addr_t vaddr = rescan_data->event->mem_event.gla;
 
     //fprintf(stderr, "%s: paddr=0x%lx pid=%d cat=%s\n",
     //    __FUNCTION__, rescan->paddr, rescan->pid, cat2str(rescan->cat));
@@ -489,18 +500,18 @@ void process_pending_rescan(gpointer data, gpointer user_data)
             monitor_trap_pml4(vmi, rescan->paddr, rescan->pid);
             break;
         case PAGE_CAT_PDPT:
-            monitor_trap_pdpt(vmi, rescan->paddr, rescan->pid);
+            monitor_trap_pdpt(vmi, rescan->paddr, rescan->pid, vaddr & VMI_BIT_MASK(39, 63));
             break;
         case PAGE_CAT_PD:
-            monitor_trap_pd(vmi, rescan->paddr, rescan->pid);
+            monitor_trap_pd(vmi, rescan->paddr, rescan->pid, vaddr & VMI_BIT_MASK(30, 63));
             break;
         case PAGE_CAT_PT:
-            monitor_trap_pt(vmi, rescan->paddr, rescan->pid);
+            monitor_trap_pt(vmi, rescan->paddr, rescan->pid, vaddr & VMI_BIT_MASK(21, 63));
             break;
         case PAGE_CAT_4KB_FRAME:
         case PAGE_CAT_2MB_FRAME:
         case PAGE_CAT_1GB_FRAME:
-            monitor_set_trap(vmi, rescan->paddr, rescan->access, rescan->pid, cat);
+            monitor_set_trap(vmi, rescan->paddr, rescan->access, rescan->pid, cat, vaddr);
             break;
         case PAGE_CAT_NOT_SET:
             break;
