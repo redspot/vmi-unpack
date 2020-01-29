@@ -232,33 +232,22 @@ void monitor_untrap_vma(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid, m
     }
     fprintf(stderr, "monitor_untrap_vma: pid=%d, base_va=0x%lx, paddr=0x%lx\n",
             pid, vma.base_va, PADDR_SHIFT(event->mem_event.gfn));
-    guint num_pages = 0;
-    gpointer *pages = g_hash_table_get_keys_as_array(exec_map, &num_pages);
-    if (pages)
+    page_cat_t cat = PAGE_CAT_4KB_FRAME;
+    trapped_page_t *trap = g_hash_table_lookup(trapped_pages, (gpointer)event->mem_event.gfn);
+    if (trap)
+      cat = trap->cat;
+    // if an instruction writes to the page that it is in,
+    // step past it then put the VMI_MEMACCESS_W on the page
+    if (rip_in_page(event->x86_regs->rip, event->mem_event.gla, cat))
     {
-      page_cat_t cat = PAGE_CAT_4KB_FRAME;
-      trapped_page_t *trap;
-      for (int i = 0; i < num_pages; i++)
-      {
-        trap = g_hash_table_lookup(trapped_pages, pages[i]);
-        if (trap)
-          cat = trap->cat;
-        // if an instruction writes to the page that it is in,
-        // step past it then put the VMI_MEMACCESS_W on the page
-        if (rip_in_page(event->x86_regs->rip, event->mem_event.gla, cat))
-        {
-          vmi_set_mem_event(vmi, (addr_t)pages[i], VMI_MEMACCESS_N, 0);
-          vmi_step_event(vmi, event, event->vcpu_id, 1, exec_retrap);
-        }
-        else
-        {
-          vmi_set_mem_event(vmi, (addr_t)pages[i], VMI_MEMACCESS_W, 0);
-        }
-        g_hash_table_remove(exec_map, pages[i]);
-      }
+      vmi_set_mem_event(vmi, event->mem_event.gfn, VMI_MEMACCESS_N, 0);
+      vmi_step_event(vmi, event, event->vcpu_id, 1, exec_retrap);
     }
-    g_free(pages);
-    g_hash_table_remove(my_pid_events->write_exec_map, (gpointer)vma.base_va);
+    else
+    {
+      vmi_set_mem_event(vmi, event->mem_event.gfn, VMI_MEMACCESS_W, 0);
+    }
+    g_hash_table_remove(exec_map, (gpointer)event->mem_event.gfn);
 }
 
 // a page belonging to the PID has been written to. place an
