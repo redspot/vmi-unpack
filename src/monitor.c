@@ -235,7 +235,7 @@ void monitor_untrap_vma(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid, m
     fprintf(stderr, "monitor_untrap_vma: pid=%d, base_va=0x%lx, paddr=0x%lx\n",
             pid, vma.base_va, paddr);
     page_cat_t cat = PAGE_CAT_4KB_FRAME;
-    trapped_page_t *trap = g_hash_table_lookup(trapped_pages, (gpointer)event->mem_event.gfn);
+    trapped_page_t *trap = g_hash_table_lookup(trapped_pages, (gpointer)paddr);
     if (trap)
       cat = trap->cat;
     // if an instruction writes to the page that it is in,
