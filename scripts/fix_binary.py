@@ -118,7 +118,7 @@ def get_virtual_memory_size(_binary):
 def align(vaddr, page_size=4096):
     """page align an address"""
     slack = vaddr % page_size
-    pad = page_size - slack
+    pad = (page_size - slack) if slack else 0
     aligned_vaddr = vaddr + pad
     return aligned_vaddr
 
