@@ -110,9 +110,9 @@ def get_virtual_memory_size(_binary):
     for sec in _binary.sections:
         if sec.virtual_address < min_offset:
             min_offset = sec.virtual_address
-        total_size += sec.virtual_size
+        total_size += align(sec.virtual_size)
     total_size += min_offset
-    return total_size
+    return align(total_size)
 
 
 def align(vaddr, page_size=4096):
