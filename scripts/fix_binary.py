@@ -205,9 +205,18 @@ def build_imports(_binary):
     return lief.parse(builder.get_build())
 
 
-def save_build(_builder, new_fn):
+def save_build(_binary, new_fn):
+    if not isinstance(_binary, lief.PE.Binary):
+        raise RuntimeError("first argument must be of type lief.PE.Binary")
     verbose_print("saving new pe: file={}".format(new_fn))
-    _builder.write(new_fn)
+    builder = lief.PE.Builder(_binary)
+    builder.build_imports(False)
+    builder.patch_imports(False)
+    builder.build_relocations(False)
+    builder.build_resources(False)
+    builder.build_tls(False)
+    builder.build()
+    builder.write(new_fn)
 
 
 def remove_iat_dir(_binary):
