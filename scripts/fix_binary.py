@@ -154,11 +154,6 @@ def restore_section_data(_binary, _bytes):
         start = section.virtual_address
         end = start + section.virtual_size
         section.content = _bytes[start:end]
-    _build = lief.PE.Builder(_binary)
-    _build.build_imports(False)
-    _build.patch_imports(False)
-    _build.build()
-    return lief.parse(_build.get_build())
 
 
 def fix_image_size(_binary, padded_size):
@@ -445,7 +440,7 @@ def main(pe_fn, new_pe_fn, impscan_fn, oep, ldr_fn, redirects_fn, debug):
     virtual_size = get_virtual_memory_size(binary)
     padded_virtual_size = align(virtual_size)
     fix_sections(binary.sections, padded_virtual_size)
-    binary = restore_section_data(binary, pe_bytes)
+    restore_section_data(binary, pe_bytes)
     fix_image_size(binary, padded_virtual_size)
     fix_section_mem_protections(binary)
     fix_checksum(binary)
