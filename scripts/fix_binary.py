@@ -198,6 +198,9 @@ def build_imports(_binary):
     builder = lief.PE.Builder(_binary)
     builder.build_imports(True)
     builder.patch_imports(False)
+    builder.build_relocations(False)
+    builder.build_resources(False)
+    builder.build_tls(False)
     builder.build()
     return lief.parse(builder.get_build())
 
