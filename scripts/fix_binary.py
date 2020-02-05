@@ -6,6 +6,7 @@ import struct
 import sys
 
 import lief
+from lief import Logger
 
 #flags and constants
 DEBUG = False
@@ -421,7 +422,12 @@ def reconstruct_imports(_ldr_fn, _redir_fn, _impscan_obj):
 @click.argument('oep')
 @click.argument('ldr_fn')
 @click.argument('redirects_fn')
-def main(pe_fn, new_pe_fn, impscan_fn, oep, ldr_fn, redirects_fn):
+@click.option('-d', '--debug', is_flag=True)
+def main(pe_fn, new_pe_fn, impscan_fn, oep, ldr_fn, redirects_fn, debug):
+    if debug:
+        Logger.enable()
+        Logger.set_level(lief.LOGGING_LEVEL.DEBUG)
+        #DEBUG = True
     verbose_print("opening existing pe: file={}".format(pe_fn))
     with open(pe_fn, 'rb') as fd:
         pe_bytes = list(fd.read())
