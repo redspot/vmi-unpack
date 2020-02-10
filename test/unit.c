@@ -28,6 +28,24 @@
 #include <rekall_parser.h>
 #include <dump.h>
 
+#define ADD_SUITE(suite, init, clean) \
+  ({ \
+     CU_pSuite _new_suite = CU_add_suite(suite, init, clean); \
+     if (!_new_suite) { \
+       CU_cleanup_registry(); \
+       return CU_get_error(); \
+     } \
+     _new_suite; \
+   })
+
+#define ADD_TEST(suite, mesg, func) \
+ do{ \
+   if (!CU_add_test(suite, mesg, func)) { \
+     CU_cleanup_registry(); \
+     return CU_get_error(); \
+   } \
+  }while(0)
+
 /* REKALL */
 
 char *linux_rekall_fp = "test/inputs/linux-rekall-example.json";
