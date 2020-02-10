@@ -97,6 +97,7 @@ TOOLS_SOURCES_VMI_TABLE_WALK := tools/vmi_table_walk.c
 TEST_SOURCES := test/unit.c
 TEST_SOURCES += src/rekall_parser.c
 TEST_SOURCES += src/dump.c
+TEST_SOURCES += src/segment_tree.c
 
 TABLE_MONITOR_OBJS := $(TOOLS_SOURCES_TABLE_MONITOR:.c=.o)
 REKALL_LINUX_OBJS := $(TOOLS_SOURCES_REKALL_LINUX:.c=.o)

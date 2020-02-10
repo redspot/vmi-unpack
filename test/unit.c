@@ -27,6 +27,7 @@
 
 #include <rekall_parser.h>
 #include <dump.h>
+#include <segment_tree.h>
 
 #define ADD_SUITE(suite, init, clean) \
   ({ \
@@ -130,11 +131,147 @@ void test_compare_hashes_dump()
     CU_ASSERT(compare_hashes(hash_b, hash_d) != 0);
 }
 
+/* SegmentTree */
+SegmentTree *test_tree = NULL;
+char *value1 = NULL, *value2 = NULL;
+const char* value_insert = "insert";
+const char* value_update = "update";
+
+int init_segment_tree(void)
+{
+  test_tree = segment_tree_new();
+  value1 = g_slice_alloc(32);
+  strcpy(value1, value_insert);
+  value2 = g_slice_alloc(32);
+  strcpy(value2, value_update);
+  return 0;
+}
+
+int clean_segment_tree(void)
+{
+  segment_tree_destroy(test_tree);
+  g_slice_free1(32, value1);
+  g_slice_free1(32, value2);
+  return 0;
+}
+
+gboolean show_segment(gpointer key, gpointer value, gpointer data) {
+  segment_key *skey = (segment_key*)key;
+  SegmentTree* tree = (SegmentTree*)data;
+  printf("low=%x high=%x min=%x max=%x\n", skey->low, skey->high, tree->min, tree->max);
+  return 0;
+}
+
+void test_tree_bad_length()
+{
+  CU_ASSERT_FALSE(segment_tree_insert(test_tree, 10, 1, NULL));
+}
+
+void test_tree_zero_length()
+{
+  CU_ASSERT_FALSE(segment_tree_insert(test_tree, 1, 1, NULL));
+}
+
+void test_tree_insertion()
+{
+  CU_ASSERT(segment_tree_insert(test_tree, 0x6000, 0x8000, value1)); //root
+  CU_ASSERT(segment_tree_insert(test_tree, 0x1000, 0x5000, NULL)); //left
+  CU_ASSERT(segment_tree_insert(test_tree, 0x8100, 0x9000, NULL)); //right
+  //g_tree_foreach(test_tree->t, show_segment, test_tree);
+}
+
+void test_tree_lookup()
+{
+  segment_key *key = NULL;
+  gpointer val = NULL;
+  CU_ASSERT(segment_tree_lookup(test_tree, 0x6000, 0x8000, &key, &val));
+  if (key)
+    { CU_ASSERT(key->low == 0x6000 && key->high == 0x8000); }
+  else
+    CU_FAIL("returned key is NULL");
+  if (val)
+    { CU_ASSERT_STRING_EQUAL(val, value_insert); }
+  else
+    CU_FAIL("returned val is NULL");
+  //printf("\n");
+  //g_tree_foreach(test_tree->t, show_segment, test_tree);
+}
+
+void test_tree_overlapping()
+{
+  //endpoint in segment
+  CU_ASSERT_FALSE(segment_tree_insert(test_tree, 0x1100, 0x5500, NULL));
+  CU_ASSERT_FALSE(segment_tree_insert(test_tree, 0x5700, 0x7000, NULL));
+  CU_ASSERT_FALSE(segment_tree_insert(test_tree, 0x1100, 0x2000, NULL));
+
+  //overlap right
+  CU_ASSERT_FALSE(segment_tree_insert(test_tree, 0x8000, 0xa000, NULL));
+
+  //overlap left
+  CU_ASSERT_FALSE(segment_tree_insert(test_tree, 0x900, 0x5500, NULL));
+
+  //segment engulfs another
+  CU_ASSERT_FALSE(segment_tree_insert(test_tree, 0x5700, 0x8100, NULL));
+
+  //update existing node
+  gpointer val = NULL;
+  CU_ASSERT(segment_tree_insert(test_tree, 0x6000, 0x8000, value2));
+  CU_ASSERT(segment_tree_lookup(test_tree, 0x6000, 0x8000, NULL, &val));
+  CU_ASSERT_STRING_EQUAL(val, value_update);
+
+  CU_ASSERT(segment_tree_lookup(test_tree, 0x1000, 0x5000, NULL, &val));
+  if (val)
+    { CU_ASSERT_STRING_EQUAL(val, value_insert); }
+  else
+    CU_PASS("returned val is NULL");
+}
+
+void test_tree_search_existent()
+{
+  segment_key *key1 = NULL, *key2 = NULL;
+  gpointer val = NULL;
+  CU_ASSERT(segment_tree_point_search(test_tree, 0x1627, &key1, NULL));
+  CU_ASSERT(segment_tree_point_search(test_tree, 0x19a2, &key2, NULL));
+  CU_ASSERT(key1 && key2 && key1 == key2);
+
+  CU_ASSERT(segment_tree_point_search(test_tree, 0x6000, &key1, &val));
+  CU_ASSERT(key1->high == 0x8000);
+  CU_ASSERT_STRING_EQUAL(val, value_update);
+  //printf("\n");
+  //g_tree_foreach(test_tree->t, show_segment, test_tree);
+}
+
+void test_tree_search_nonexistent()
+{
+  CU_ASSERT_FALSE(segment_tree_point_search(test_tree, 0xdeadbeef, NULL, NULL));
+  //printf("\n");
+  //g_tree_foreach(test_tree->t, show_segment, test_tree);
+}
+
+void test_tree_remove_nonexistent()
+{
+  CU_ASSERT_FALSE(segment_tree_remove(test_tree, 0xbad, 0xfad));
+  CU_ASSERT_FALSE(segment_tree_remove(test_tree, 0xdead, 0xbeef)); //test low > high
+  //printf("\n");
+  //g_tree_foreach(test_tree->t, show_segment, test_tree);
+}
+
+void test_tree_remove_existent()
+{
+  CU_ASSERT(segment_tree_remove(test_tree, 0x1000, 0x5000));
+  //printf("\n");
+  //g_tree_foreach(test_tree->t, show_segment, test_tree);
+  CU_ASSERT_FALSE(segment_tree_point_search(test_tree, 0x1000, NULL, NULL));
+  CU_ASSERT_FALSE(segment_tree_lookup(test_tree, 0x1000, 0x5000, NULL, NULL));
+  CU_ASSERT(test_tree->min == 0x6000 && test_tree->max == 0x9000);
+}
+
 int main(int argc, char *argv[])
 {
     unsigned int fails;
     CU_pSuite pSuiteRekall = NULL;
     CU_pSuite pSuiteDump = NULL;
+    CU_pSuite pSuiteTree = NULL;
 
     if (CUE_SUCCESS != CU_initialize_registry())
         return CU_get_error();
@@ -150,6 +287,18 @@ int main(int argc, char *argv[])
     pSuiteDump = ADD_SUITE("Suite_Dump", NULL, NULL);
     ADD_TEST(pSuiteDump, "test compare hashes dump", test_compare_hashes_dump);
 
+    // SegmentTree
+    CU_pSuite pSuiteTree = NULL;
+    pSuiteTree = ADD_SUITE("Suite_SegmentTree", init_segment_tree, clean_segment_tree);
+    ADD_TEST(pSuiteTree, "insertion of invalid-length segment", test_tree_bad_length);
+    ADD_TEST(pSuiteTree, "insertion of zero-length segment", test_tree_zero_length);
+    ADD_TEST(pSuiteTree, "insertion of new segment", test_tree_insertion);
+    ADD_TEST(pSuiteTree, "lookup of existing key/val", test_tree_lookup);
+    ADD_TEST(pSuiteTree, "insertion of overlapping segment", test_tree_overlapping);
+    ADD_TEST(pSuiteTree, "search for existent segment", test_tree_search_existent);
+    ADD_TEST(pSuiteTree, "search for non-existent segment", test_tree_search_nonexistent);
+    ADD_TEST(pSuiteTree, "removal of non-existent segment", test_tree_remove_nonexistent);
+    ADD_TEST(pSuiteTree, "removal of existent segment", test_tree_remove_existent);
 
     CU_basic_set_mode(CU_BRM_NORMAL);
     CU_basic_run_tests();
