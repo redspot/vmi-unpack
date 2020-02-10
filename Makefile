@@ -166,7 +166,10 @@ release: $(TARGET)
 
 tools: $(TARGET_TOOLS)
 
+test: CXXFLAGS += $(DEBUG_CFLAGS_COMMON)
+test: CFLAGS += $(DEBUG_CFLAGS_COMMON)
 test: $(TARGET_TEST)
+	$(TARGET_TEST)
 
 astyle:
 	tools/astyle/run.sh
