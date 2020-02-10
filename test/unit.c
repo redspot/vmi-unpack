@@ -141,34 +141,15 @@ int main(int argc, char *argv[])
 
     // Rekall
 
-    pSuiteRekall = CU_add_suite("Suite_Rekall", init_rekall_suite, NULL);
-    if (!pSuiteRekall)
-    {
-        CU_cleanup_registry();
-        return CU_get_error();
-    }
-
-    if (!CU_add_test(pSuiteRekall, "test linux rekall", test_linux_rekall) ||
-        !CU_add_test(pSuiteRekall, "test windows rekall", test_windows_rekall))
-    {
-        CU_cleanup_registry();
-        return CU_get_error();
-    }
+    pSuiteRekall = ADD_SUITE("Suite_Rekall", init_rekall_suite, NULL);
+    ADD_TEST(pSuiteRekall, "test linux rekall", test_linux_rekall);
+    ADD_TEST(pSuiteRekall, "test windows rekall", test_windows_rekall);
 
     // Dump
 
-    pSuiteDump = CU_add_suite("Suite_Dump", NULL, NULL);
-    if (!pSuiteDump)
-    {
-        CU_cleanup_registry();
-        return CU_get_error();
-    }
+    pSuiteDump = ADD_SUITE("Suite_Dump", NULL, NULL);
+    ADD_TEST(pSuiteDump, "test compare hashes dump", test_compare_hashes_dump);
 
-    if (!CU_add_test(pSuiteDump, "test compare hashes dump", test_compare_hashes_dump))
-    {
-        CU_cleanup_registry();
-        return CU_get_error();
-    }
 
     CU_basic_set_mode(CU_BRM_NORMAL);
     CU_basic_run_tests();
