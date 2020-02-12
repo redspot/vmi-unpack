@@ -693,6 +693,7 @@ event_response_t monitor_handler(vmi_instance_t vmi, vmi_event_t *event)
         return VMI_EVENT_RESPONSE_NONE;
 
     addr_t paddr = PADDR_SHIFT(event->mem_event.gfn);
+    addr_t vaddr = event->mem_event.gla;
     trapped_page_t *trap = g_hash_table_lookup(trapped_pages, (gpointer)paddr);
 
     if (trap == NULL)
@@ -736,7 +737,7 @@ event_response_t monitor_handler(vmi_instance_t vmi, vmi_event_t *event)
             {
                 addr_t page;
                 vmi_v2pcache_flush(vmi, my_pid_events->cr3);
-                status_t s = vmi_pagetable_lookup(vmi, my_pid_events->cr3, event->mem_event.gla, &page);
+                status_t s = vmi_pagetable_lookup(vmi, my_pid_events->cr3, vaddr, &page);
                 if (s != VMI_SUCCESS)
                 {
                     //our PID no longer has this page
@@ -776,7 +777,7 @@ event_response_t monitor_handler(vmi_instance_t vmi, vmi_event_t *event)
 
     if (is_userspace_page(trap->cat))
     {
-        mem_seg_t vma = vmi_current_find_segment(vmi, event, event->mem_event.gla);
+        mem_seg_t vma = vmi_current_find_segment(vmi, event, vaddr);
         if (!vma.size)
         {
             goto after_not_found;
@@ -789,14 +790,14 @@ event_response_t monitor_handler(vmi_instance_t vmi, vmi_event_t *event)
             addr_t pid_pa = 0, evt_pa = 0;
 
             vmi_v2pcache_flush(vmi, my_pid_events->cr3);
-            vmi_pagetable_lookup(vmi, my_pid_events->cr3, event->mem_event.gla, &pid_pa);
+            vmi_pagetable_lookup(vmi, my_pid_events->cr3, vaddr, &pid_pa);
             vmi_v2pcache_flush(vmi, event->x86_regs->cr3);
-            vmi_pagetable_lookup(vmi, event->x86_regs->cr3, event->mem_event.gla, &evt_pa);
+            vmi_pagetable_lookup(vmi, event->x86_regs->cr3, vaddr, &evt_pa);
             fprintf(stderr, mesg, __FUNCTION__,
                     pid, curr_pid,
                     my_pid_events->cr3, event->x86_regs->cr3,
                     pid_pa, evt_pa,
-                    event->mem_event.gla, paddr
+                    vaddr, paddr
                    );
 after_not_found:
 
@@ -819,7 +820,7 @@ after_not_found:
         }
         if (event->mem_event.out_access & VMI_MEMACCESS_X)
         {
-            if ((my_pid_events->flags & MONITOR_HIGH_ADDRS) || event->mem_event.gla < HIGH_ADDR_MARK)
+            if ((my_pid_events->flags & MONITOR_HIGH_ADDRS) || vaddr < HIGH_ADDR_MARK)
                 if (addr_in_range(event->x86_regs->rip, my_pid_events->vad_pe_start, my_pid_events->vad_pe_size)
                     )
                     my_pid_events->cb(vmi, event, pid, trap->cat);
