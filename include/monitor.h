@@ -104,6 +104,7 @@ typedef void (*page_table_monitor_cb_t)(vmi_instance_t, vmi_event_t *, vmi_pid_t
 typedef struct
 {
     addr_t paddr;
+    addr_t vaddr;
     vmi_pid_t pid;
     page_cat_t cat;
     vmi_mem_access_t access;

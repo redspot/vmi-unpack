@@ -150,19 +150,20 @@ void monitor_unset_trap(vmi_instance_t vmi, addr_t paddr)
     g_hash_table_remove(trapped_pages, (gpointer)paddr);
 }
 
-static inline pending_rescan_t *make_rescan(addr_t paddr, vmi_pid_t pid, page_cat_t cat)
+static inline pending_rescan_t *make_rescan(addr_t paddr, addr_t vaddr, vmi_pid_t pid, page_cat_t cat)
 {
     pending_rescan_t *pending = (pending_rescan_t *) malloc(sizeof(pending_rescan_t));
     pending->paddr = paddr;
+    pending->vaddr = vaddr;
     pending->pid   = pid;
     pending->cat   = cat;
     pending->access = VMI_MEMACCESS_INVALID;
     return pending;
 }
 
-static inline pending_rescan_t *make_retrap(addr_t paddr, vmi_pid_t pid, page_cat_t cat, vmi_mem_access_t access)
+static inline pending_rescan_t *make_retrap(addr_t paddr, addr_t vaddr, vmi_pid_t pid, page_cat_t cat, vmi_mem_access_t access)
 {
-    pending_rescan_t *pending = make_rescan(paddr, pid, cat);
+    pending_rescan_t *pending = make_rescan(paddr, vaddr, pid, cat);
     pending->access = access;
     return pending;
 }
@@ -181,7 +182,6 @@ event_response_t cr3_retrap(vmi_instance_t vmi, vmi_event_t *event)
     if (pending_page_retrap)
     {
         cb_data.vmi = vmi;
-        cb_data.event = event;
         cb_data.list = &pending_page_retrap;
         g_slist_foreach(pending_page_retrap, process_pending_rescan, &cb_data);
     }
@@ -485,9 +485,9 @@ void monitor_trap_table(vmi_instance_t vmi, pid_events_t *pid_event)
     monitor_trap_pml4(vmi, dtb, pid_event->pid);
 }
 
-void queue_pending_rescan(addr_t paddr, vmi_pid_t pid, page_cat_t cat, GSList **list)
+void queue_pending_rescan(addr_t paddr, addr_t vaddr, vmi_pid_t pid, page_cat_t cat, GSList **list)
 {
-    pending_rescan_t *pending = make_rescan(paddr, pid, cat);
+    pending_rescan_t *pending = make_rescan(paddr, vaddr, pid, cat);
     *list = g_slist_prepend(*list, pending);
 }
 
@@ -496,7 +496,8 @@ void process_pending_rescan(gpointer data, gpointer user_data)
     pending_rescan_t *rescan = (pending_rescan_t *) data;
     foreach_data_t *rescan_data = (foreach_data_t *) user_data;
     vmi_instance_t vmi = rescan_data->vmi;
-    addr_t vaddr = rescan_data->event->mem_event.gla;
+    addr_t vaddr = rescan->vaddr;
+    addr_t index;
 
     //fprintf(stderr, "%s: paddr=0x%lx pid=%d cat=%s\n",
     //    __FUNCTION__, rescan->paddr, rescan->pid, cat2str(rescan->cat));
@@ -507,13 +508,16 @@ void process_pending_rescan(gpointer data, gpointer user_data)
             monitor_trap_pml4(vmi, rescan->paddr, rescan->pid);
             break;
         case PAGE_CAT_PDPT:
-            monitor_trap_pdpt(vmi, rescan->paddr, rescan->pid, vaddr & VMI_BIT_MASK(39, 63));
+            index = vaddr & VMI_BIT_MASK(39, 47);
+            monitor_trap_pdpt(vmi, rescan->paddr, rescan->pid, index);
             break;
         case PAGE_CAT_PD:
-            monitor_trap_pd(vmi, rescan->paddr, rescan->pid, vaddr & VMI_BIT_MASK(30, 63));
+            index = vaddr & VMI_BIT_MASK(30, 47);
+            monitor_trap_pd(vmi, rescan->paddr, rescan->pid, index);
             break;
         case PAGE_CAT_PT:
-            monitor_trap_pt(vmi, rescan->paddr, rescan->pid, vaddr & VMI_BIT_MASK(21, 63));
+            index = vaddr & VMI_BIT_MASK(21, 47);
+            monitor_trap_pt(vmi, rescan->paddr, rescan->pid, index);
             break;
         case PAGE_CAT_4KB_FRAME:
         case PAGE_CAT_2MB_FRAME:
@@ -752,7 +756,7 @@ event_response_t monitor_handler(vmi_instance_t vmi, vmi_event_t *event)
                              curr_name, curr_pid, access2str(event));
                     free(curr_name);
                     trace_trap(paddr, trap, mesg);
-                    pending_rescan_t *retrap = make_retrap(paddr, pid, trap->cat, event->mem_event.out_access);
+                    pending_rescan_t *retrap = make_retrap(paddr, vaddr, pid, trap->cat, event->mem_event.out_access);
                     untrap_and_schedule_retrap(vmi, pending_page_retrap, retrap);
                     return VMI_EVENT_RESPONSE_NONE;
                 }
@@ -804,7 +808,7 @@ after_not_found:
             // write traps are only set by monitor_set_trap() and exec by monitor_trap_vma()
             if (event->mem_event.out_access & VMI_MEMACCESS_W)
             {
-                pending_rescan_t *retrap = make_retrap(paddr, pid, trap->cat, event->mem_event.out_access);
+                pending_rescan_t *retrap = make_retrap(paddr, vaddr, pid, trap->cat, event->mem_event.out_access);
                 untrap_and_schedule_retrap(vmi, pending_page_retrap, retrap);
             }
             else if (event->mem_event.out_access & VMI_MEMACCESS_X)
@@ -845,7 +849,7 @@ after_not_found:
     {
         //fprintf(stderr, "%s: paddr=0x%lx pid=%d cat=%s access=%s curr_pid=%d\n",
         //    __FUNCTION__, paddr, pid, cat2str(trap->cat), access2str(event), curr_pid);
-        queue_pending_rescan(paddr, pid, trap->cat, &pending_page_rescan);
+        queue_pending_rescan(paddr, vaddr, pid, trap->cat, &pending_page_rescan);
         return (VMI_EVENT_RESPONSE_EMULATE | VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP);
     }
 }
