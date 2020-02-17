@@ -661,7 +661,7 @@ gboolean find_process_in_vads(vmi_instance_t vmi, pid_events_t *pid_evts, int co
     goto out;
   else {
     maps = map_process_vads(pid_evts->pid, count);
-    vad_bundle = g_slice_new(vadinfo_bundle_t);
+    vad_bundle = g_slice_new0(vadinfo_bundle_t);
     vad_bundle->sequence = count;
     vad_bundle->vadinfo_maps = maps;
     g_ptr_array_add(pid_evts->vadinfo_bundles, vad_bundle);
