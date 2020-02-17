@@ -26,6 +26,7 @@
 
 #include <libvmi/libvmi.h>
 
+#include <config.h>
 #include <monitor.h>
 #include <dump.h>
 #include <output.h>
@@ -40,6 +41,9 @@ char *output_dir = NULL;
 char *rekall = NULL;
 vmi_pid_t process_pid = 0;
 uint8_t tracking_flags = MONITOR_FOLLOW_REMAPPING;
+char *config_file_path = NULL;
+
+static const char *default_config_path = "./unpack.cfg";
 
 /* Signal handler */
 static int interrupted = 0;
@@ -65,6 +69,8 @@ void usage(char *name)
     printf("    -p <pid>                 Unpack process with provided PID.\n");
     printf("    -n <process_name>        Unpack process with provided name.\n");
     printf("\n");
+    printf("Recommended arguments:\n");
+    printf("    -c                       Path to '[global]\\nkey=val' config file.\n");
     printf("Optional arguments:\n");
     printf("    -f                       Also follow children created by target process.\n");
     printf("    -l                       Monitor library, heap and stack pages. By default, these are ignored.\n");
@@ -111,7 +117,7 @@ int main(int argc, char *argv[])
     int c;
 
     // Parse arguments
-    while ((c = getopt(argc, argv, "d:r:v:o:p:n:fl")) != -1)
+    while ((c = getopt(argc, argv, "d:r:v:o:p:n:c:fl")) != -1)
     {
         switch (c)
         {
@@ -133,6 +139,9 @@ int main(int argc, char *argv[])
             case 'n':
                 process_name = optarg;
                 break;
+            case 'c':
+                config_file_path = optarg;
+                break;
             case 'f':
                 tracking_flags |= MONITOR_FOLLOW_CHILDREN;
                 break;
@@ -143,6 +152,19 @@ int main(int argc, char *argv[])
                 usage(argv[0]);
                 return EXIT_FAILURE;
         }
+    }
+
+    if (!config_file_path)
+        config_file_path = (typeof(config_file_path))default_config_path;
+    if (config_file_path)
+    {
+        if (!load_config_file(config_file_path))
+        {
+            //trace_config("config did not load: path=%s", config_file_path);
+        }
+        //once loaded, we can close it
+        close_config_file();
+        atexit(free_config);
     }
 
     if (!domain_name || !rekall || !vol_profile || !output_dir ||
