@@ -34,6 +34,7 @@
 #include <libvmi/peparse.h>
 #include <json-glib/json-glib.h>
 
+#include <config.h>
 #include <monitor.h>
 #include <dump.h>
 #include <output.h>
@@ -272,17 +273,16 @@ out:
 
 void volatility_callback_vaddump(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid, page_cat_t page_cat)
 {
-    char *cmd_prefix = "/home/wmartin45/bin/";
     addr_t oep;
     addr_t base_va;
     pid_events_t *pid_event = g_hash_table_lookup(vmi_events_by_pid, GINT_TO_POINTER(pid));
 
-    volatility_vaddump(pid, cmd_prefix, dump_count);
-    volatility_vadinfo(pid, cmd_prefix, dump_count);
-    volatility_ldrmodules(pid, cmd_prefix, dump_count);
+    volatility_vaddump(pid, global.volatility_cmd_prefix, dump_count);
+    volatility_vadinfo(pid, global.volatility_cmd_prefix, dump_count);
+    volatility_ldrmodules(pid, global.volatility_cmd_prefix, dump_count);
 
     base_va = pid_event->peb_imagebase_va ? pid_event->peb_imagebase_va : pid_event->vad_pe_start;
-    volatility_impscan(vmi, pid_event, base_va, cmd_prefix, dump_count);
+    volatility_impscan(vmi, pid_event, base_va, global.volatility_cmd_prefix, dump_count);
 
     oep = event->x86_regs->rip - base_va;
     fprintf(stderr, "%s: rip=%p base_va=%p oep=%p\n", __func__,
