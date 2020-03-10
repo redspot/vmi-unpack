@@ -148,7 +148,7 @@ GHashTable *vmi_get_all_pids_windows(vmi_instance_t vmi)
         addr_t pid_ptr = eprocess + process_vmi_windows_rekall.eprocess_pid;
         if (vmi_read_32_va(vmi, pid_ptr, 0, (uint32_t *) &pid) == VMI_SUCCESS)
         {
-            g_hash_table_add(all_pids, GINT_TO_POINTER(pid));
+            g_hash_table_insert(all_pids, GINT_TO_POINTER(pid), GINT_TO_POINTER(eprocess));
         }
         else
         {
