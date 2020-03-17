@@ -45,24 +45,33 @@ def parse_volatility_json(fn):
     return (vads, res)
 
 
-def parse_impscan_json(fn):
-    is_list, _ = parse_volatility_json(fn)
-    is_rva = defaultdict(lambda: int(0x10000))
-    is_lookup = defaultdict(dict)
-    for entry in is_list:
+def parse_impscan_json(_dir, _count, _pid):
+    suffix = f'{int(_count):04}.{_pid}.json'
+    vadinfo_fn = os.path.join(_dir, f'vadinfo.{suffix}')
+    _, raw_json = parse_volatility_json(vadinfo_fn)
+    _oep = raw_json['rip']
+    ldrmodules_fn = os.path.join(_dir, f'ldrmodules.{suffix}')
+
+    obj = lambda: None  # noqa: E731
+    obj.rva = defaultdict(lambda: int(0x10000))
+    obj.lookup = defaultdict(dict)
+    obj.raw = []
+
+    impscan_glob = os.path.join(_dir, f'impscan.section????.{suffix}')
+    for fn in glob(impscan_glob):
+        is_list, _ = parse_volatility_json(fn)
+        obj.raw += is_list
+
+    for entry in obj.raw:
         lib = _nc(entry['Module'])
         if lib in import_blacklist:
             continue
         func = entry['Function']
         iat = entry['IAT'] & 0xffff
-        if iat < is_rva[lib]:
-            is_rva[lib] = iat
-        is_lookup[lib][func] = iat
-    obj = lambda: None
-    obj.rva = is_rva
-    obj.lookup = is_lookup
-    obj.raw = is_list
-    return obj
+        if iat < obj.rva[lib]:
+            obj.rva[lib] = iat
+        obj.lookup[lib][func] = iat
+    return (obj, ldrmodules_fn, _oep)
 
 
 def fix_oep(_binary, oep):
@@ -436,12 +445,12 @@ def reconstruct_imports(_ldr_fn, _redir_fn, _impscan_obj):
 @click.command()
 @click.argument('pe_fn')
 @click.argument('new_pe_fn')
-@click.argument('impscan_fn')
-@click.argument('oep')
-@click.argument('ldr_fn')
+@click.argument('json_dir')
+@click.argument('dump_count')
+@click.argument('pid')
 @click.argument('redirects_fn')
 @click.option('-d', '--debug', is_flag=True)
-def main(pe_fn, new_pe_fn, impscan_fn, oep, ldr_fn, redirects_fn, debug):
+def main(pe_fn, new_pe_fn, json_dir, dump_count, pid, redirects_fn, debug):
     if debug:
         Logger.enable()
         Logger.set_level(lief.LOGGING_LEVEL.DEBUG)
@@ -451,7 +460,7 @@ def main(pe_fn, new_pe_fn, impscan_fn, oep, ldr_fn, redirects_fn, debug):
         pe_bytes = list(fd.read())
     binary = lief.parse(pe_bytes)
 
-    impscan_obj = parse_impscan_json(impscan_fn)
+    impscan_obj, ldr_fn, oep = parse_impscan_json(json_dir, dump_count, pid)
     imports_to_add = reconstruct_imports(ldr_fn, redirects_fn, impscan_obj)
     verbose_print(f"found {len(imports_to_add)} libraries with "
                   f"{sum([len(v) for k,v in imports_to_add.items()])}"
