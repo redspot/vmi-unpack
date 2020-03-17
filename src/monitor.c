@@ -135,19 +135,26 @@ static inline int rip_in_page(addr_t rip, addr_t vaddr, page_cat_t cat)
 void monitor_set_trap(vmi_instance_t vmi, addr_t paddr, vmi_mem_access_t access,
                       vmi_pid_t pid, page_cat_t cat, addr_t vaddr)
 {
+    pid_events_t *pid_event = NULL;
     trapped_page_t *trap = g_hash_table_lookup(trapped_pages, (gpointer)paddr);
 
     if (!trap)
     {
+        if (pid != 0)
+            pid_event = g_hash_table_lookup(vmi_events_by_pid, GINT_TO_POINTER(pid));
+        if (pid_event &&
+                !(pid_event->flags & MONITOR_HIGH_ADDRS) &&
+                vaddr > 4096 &&
+                !addr_in_range(vaddr, pid_event->vad_pe_start, pid_event->vad_pe_size))
+            return;
         trap = g_slice_new(trapped_page_t);
         trap->pid = pid;
         trap->cat = cat;
         trap->vaddr = vaddr;
         g_hash_table_insert(trapped_pages, (gpointer)paddr, trap);
         vmi_set_mem_event(vmi, GFN_SHIFT(paddr), access, 0);
-        pid_events_t *my_pid_events = g_hash_table_lookup(vmi_events_by_pid, GINT_TO_POINTER(pid));
-        if (my_pid_events)
-            g_hash_table_add(my_pid_events->wr_traps, (gpointer)paddr);
+        if (pid_event)
+            g_hash_table_add(pid_event->wr_traps, (gpointer)paddr);
         trace_trap(paddr, trap, "new trap");
     }
 }
