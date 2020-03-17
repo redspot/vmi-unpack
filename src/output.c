@@ -207,6 +207,15 @@ char* make_vadinfo_json_fn(vmi_pid_t pid, int count)
     return filepath;
 }
 
+int delete_vadinfo_json(vmi_pid_t pid, int count)
+{
+    int rc = -1;
+    char *jsonpath = make_vadinfo_json_fn(pid, count);
+    rc = unlink(jsonpath);
+    free(jsonpath);
+    return rc;
+}
+
 int add_rip_to_json(vmi_pid_t pid, int count, reg_t rip)
 {
     char rip_buf[32] = {0};
@@ -223,7 +232,7 @@ int add_rip_to_json(vmi_pid_t pid, int count, reg_t rip)
 #endif
 
     filepath = make_vadinfo_json_fn(pid, count);
- 
+
     parser = read_json_file(filepath);
     if (!parser)
     {
