@@ -368,6 +368,7 @@ pid_events_t *add_new_pid(vmi_pid_t pid)
     pval->vad_pe_index = -1;
     pval->vad_pe_start = HIGH_ADDR_MARK;
     pval->vad_pe_size = 0;
+    pval->has_run_once = 0;
     return pval;
 }
 
@@ -781,18 +782,25 @@ event_response_t monitor_handler_cr3(vmi_instance_t vmi, vmi_event_t *event)
         {
             if (pid_event)
             {
-                fprintf(stderr, "%s: trapping table, pid=%d evt_cr3=0x%lx\n", __FUNCTION__, pid, evt_cr3);
+                watch_ntdll(vmi);
                 g_hash_table_insert(cr3_to_pid, (gpointer)evt_cr3, GINT_TO_POINTER(pid));
                 if (!pid_event->process_name)
-                  pid_event->process_name = vmi_current_name(vmi, event);
+                {
+                    pid_event->process_name = vmi_current_name(vmi, event);
+                    fprintf(stderr, "%s: pid=%d eprocess=0x%lx name={%s}\n",
+                            __FUNCTION__, pid, pid_event->eprocess, pid_event->process_name);
+                }
+                volatility_vadinfo(pid, global.volatility_cmd_prefix, dump_count);
+                if (pid_event->pid != pid) //data structure bugfix
+                    pid_event->pid = pid;
                 if (find_process_in_vads(vmi, pid_event, dump_count)) {
                   vadinfo_bundle_t *bundle = g_ptr_array_index(pid_event->vadinfo_bundles, dump_count);
                   fprintf(stderr, "%s: pid=%d pe_index=%d\n", __FUNCTION__, pid, bundle->pe_index);
                   //if (bundle->parsed_pe)
                   //  show_parsed_pe(bundle->parsed_pe);
                 }
+                delete_vadinfo_json(pid_event->pid, dump_count);
                 dump_count++;
-                monitor_trap_table(vmi, pid_event);
             }
             else
             {
@@ -889,6 +897,8 @@ event_response_t monitor_handler(vmi_instance_t vmi, vmi_event_t *event)
 
     pid = trap->pid;
     vmi_pid_t curr_pid = vmi_current_pid(vmi, event);
+    if (pid == 0) // pid=0 means its part of ntdll
+        pid = curr_pid;
 
     //printf("monitor_handler:recv_event rip=%p paddr=%p cat=%s access=%s curr_pid=%d\n",
     //    (void *) event->x86_regs->rip, (void *) paddr, cat2str(trap->cat), access2str(event), curr_pid);
@@ -953,8 +963,16 @@ event_response_t monitor_handler(vmi_instance_t vmi, vmi_event_t *event)
     my_pid_events = g_hash_table_lookup(vmi_events_by_pid, GINT_TO_POINTER(pid));
     if (my_pid_events == NULL)
     {
-        fprintf(stderr, "WARNING: Monitor - Failed to find callback event for PID %d\n", pid);
-        monitor_unset_trap(vmi, paddr);
+        if (trap->pid == 0)
+        {
+            pending_rescan_t *retrap = make_retrap(paddr, vaddr, trap->pid, trap->cat, event->mem_event.out_access);
+            untrap_and_schedule_retrap(vmi, pending_page_retrap, retrap);
+        }
+        else
+        {
+            fprintf(stderr, "WARNING: Monitor - Failed to find callback event for PID %d\n", pid);
+            monitor_unset_trap(vmi, paddr);
+        }
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -1003,14 +1021,30 @@ after_not_found:
         }
         if (event->mem_event.out_access & VMI_MEMACCESS_X)
         {
-            if ((my_pid_events->flags & MONITOR_HIGH_ADDRS) || vaddr < HIGH_ADDR_MARK)
-                if (addr_in_range(event->x86_regs->rip, my_pid_events->vad_pe_start, my_pid_events->vad_pe_size)
-                    )
-                    my_pid_events->cb(vmi, event, pid, trap->cat);
-                else { trace_exec("VMI_MEMACCESS_X: address not in range: rip=0x%lx", event->x86_regs->rip); }
-            else { trace_exec("VMI_MEMACCESS_X: address not below HIGH_ADDR_MARK: rip=0x%lx", event->x86_regs->rip); }
-            trace_exec("calling monitor_untrap_vma:VMI_MEMACCESS_X: rip=0x%lx", event->x86_regs->rip);
-            monitor_untrap_vma(vmi, event, pid, vma);
+            if (ntdll_pa_pages
+                    && g_hash_table_contains(ntdll_pa_pages, GINT_TO_POINTER(paddr)))
+            {
+                trace_ntdll("exec in ntdll by pid=%d", pid);
+                if (!my_pid_events->has_run_once)
+                {
+                    my_pid_events->has_run_once = 1;
+                    trace_ntdll("exec in ntdll by pid=%d, trapping table", pid);
+                    monitor_trap_table(vmi, my_pid_events);
+                }
+                pending_rescan_t *retrap = make_retrap(paddr, vaddr, pid, trap->cat, event->mem_event.out_access);
+                untrap_and_schedule_retrap(vmi, pending_page_retrap, retrap);
+            }
+            else
+            {
+                if ((my_pid_events->flags & MONITOR_HIGH_ADDRS) || vaddr < HIGH_ADDR_MARK)
+                    if (addr_in_range(event->x86_regs->rip, my_pid_events->vad_pe_start, my_pid_events->vad_pe_size)
+                        )
+                        my_pid_events->cb(vmi, event, pid, trap->cat);
+                    else { trace_exec("VMI_MEMACCESS_X: address not in range: rip=0x%lx", event->x86_regs->rip); }
+                else { trace_exec("VMI_MEMACCESS_X: address not below HIGH_ADDR_MARK: rip=0x%lx", event->x86_regs->rip); }
+                trace_exec("calling monitor_untrap_vma:VMI_MEMACCESS_X: rip=0x%lx", event->x86_regs->rip);
+                monitor_untrap_vma(vmi, event, pid, vma);
+            }
         }
         else if (event->mem_event.out_access & VMI_MEMACCESS_W)
         {
@@ -1103,6 +1137,7 @@ void monitor_destroy(vmi_instance_t vmi)
     g_hash_table_destroy(vmi_events_by_pid);
     g_slist_free_full(pending_page_rescan, free);
     g_slist_free_full(pending_page_retrap, free);
+	destroy_ntdll();
 
     page_table_monitor_init = 0;
 }
@@ -1141,14 +1176,19 @@ void monitor_add_page_table(vmi_instance_t vmi, vmi_pid_t pid, page_table_monito
     pid_event->flags = flags;
     pid_event->cb = cb;
     pid_event->eprocess = vmi_get_process_by_cr3(vmi, pid_event->cr3);
+    char *name = NULL;
     //set the pid to 0 as a flag that its page table has not been scanned yet
     //then delay trapping its page table until it first executes
     g_hash_table_insert(cr3_to_pid, (gpointer)pid_event->cr3, 0);
-    fprintf(stderr, "%s: pid=%d cr3=0x%lx\n", __FUNCTION__, pid, pid_event->cr3);
+    trace("pid=%d cr3=0x%lx eprocess=0x%lx name={%s}",
+            pid, pid_event->cr3, pid_event->eprocess,
+            (name = vmi_get_eprocess_name(vmi, pid_event->eprocess))
+         );
+    if (name) free(name);
 
-    //the table trap is delayed until the pid is first seen in monitor_handler_cr3()
-    //monitor_trap_table(vmi, pid_event);
-    volatility_vadinfo(pid, "", dump_count);
+    //the table trap is delayed until:
+    //    the pid is first seen in monitor_handler_cr3(), ntdll exec is trapped
+    //    ntdll is executed by our pid, then trap the pagetable
 }
 
 void monitor_remove_page_table(vmi_instance_t vmi, vmi_pid_t pid)
