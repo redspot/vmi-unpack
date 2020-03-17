@@ -39,6 +39,20 @@
 #define GFN_SHIFT(paddr) ((paddr) >> 12)
 #define PADDR_SHIFT(gfn) ((gfn) << 12)
 
+//Globals
+addr_t max_paddr;
+bool page_table_monitor_init;
+vmi_event_t page_table_monitor_event;
+vmi_event_t page_table_monitor_ss;
+vmi_event_t page_table_monitor_cr3;
+GHashTable *trapped_pages;     // key: addr_t, value: page_attr_t
+GHashTable *cr3_to_pid;        // key: reg_t, value: vmi_pid_t
+GHashTable *prev_vma;          // key: vmi_pid_t, value: prev_vma_t
+GHashTable *vmi_events_by_pid; // key: vmi_pid_t, value: pid_events_t
+GSList *pending_page_rescan;   // queue of table rescans
+GSList *pending_page_retrap;   // queue of userspace retraps
+GSList *cr3_callbacks;         // list of CR3 write callbacks
+
 void process_pending_rescan(gpointer data, gpointer user_data);
 
 int check_prev_vma(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid, addr_t vaddr, addr_t paddr)
