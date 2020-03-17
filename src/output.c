@@ -281,7 +281,7 @@ void volatility_callback_vaddump(vmi_instance_t vmi, vmi_event_t *event, vmi_pid
     volatility_vadinfo(pid, global.volatility_cmd_prefix, dump_count);
     volatility_ldrmodules(pid, global.volatility_cmd_prefix, dump_count);
 
-    base_va = pid_event->peb_imagebase_va ? pid_event->peb_imagebase_va : pid_event->vad_pe_start;
+    base_va = pid_event->vad_pe_start;
     volatility_impscan(vmi, pid_event, base_va, global.volatility_cmd_prefix, dump_count);
 
     oep = event->x86_regs->rip - base_va;
@@ -590,10 +590,7 @@ gboolean parse_pe(vmi_instance_t vmi, pid_events_t *pid_event, parsed_pe_t *pe)
     .translate_mechanism = VMI_TM_PROCESS_DTB,
     .dtb = pid_event->cr3,
   };
-  if (pid_event->peb_imagebase_va)
-    imagebase = pid_event->peb_imagebase_va;
-  else
-    imagebase = pid_event->vad_pe_start;
+  imagebase = pid_event->vad_pe_start;
   ctx.addr = imagebase;
 
   pe->proc_first_page = malloc(MAX_PE_HEADER_SIZE);
@@ -621,7 +618,7 @@ gboolean parse_pe(vmi_instance_t vmi, pid_events_t *pid_event, parsed_pe_t *pe)
   if (status != VMI_SUCCESS)
   {
     fprintf(stderr, "%s: error: cannot read PE section table from imagebase=%p\n",
-        __func__, (void*)pid_event->peb_imagebase_va);
+        __func__, (void*)imagebase);
     free(pe->proc_first_page);
     pe->proc_first_page = NULL;
     free(pe->section_table);

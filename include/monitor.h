@@ -151,7 +151,6 @@ typedef struct
     addr_t vad_pe_start;
     size_t vad_pe_size;
     addr_t eprocess;
-    addr_t peb_imagebase_va;
 } pid_events_t;
 
 typedef struct
