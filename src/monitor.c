@@ -54,6 +54,8 @@ GHashTable *vmi_events_by_pid; // key: vmi_pid_t, value: pid_events_t
 GSList *pending_page_rescan;   // queue of table rescans
 GSList *pending_page_retrap;   // queue of userspace retraps
 GSList *cr3_callbacks;         // list of CR3 write callbacks
+//stuff for watching ntdll physical pages
+GHashTable *ntdll_pa_pages = NULL; // key: addr_t as paddr not gfn, value: page_info_t*
 
 void process_pending_rescan(gpointer data, gpointer user_data);
 
@@ -553,6 +555,160 @@ void process_pending_rescan(gpointer data, gpointer user_data)
 
     *rescan_data->list = g_slist_remove(*rescan_data->list, data);
     free(data);
+}
+
+//walk through vadinfo bundles to re-create
+int build_userspace_page_maps(vmi_instance_t vmi, pid_events_t *pid_event,
+	GHashTable* map)
+{
+    int added = 0;
+    if (my_assert((pid_event->vad_pe_index == -1),
+		make_static_mesg("vad_pe_index == -1")))
+        goto out;
+    vadinfo_bundle_t *current_bundle = g_ptr_array_index(pid_event->vadinfo_bundles, pid_event->vad_pe_index);
+    if (my_assert(!current_bundle,
+		make_static_mesg("current_bundle is NULL")))
+        goto out;
+    GPtrArray *vad_maps = current_bundle->vadinfo_maps;
+    if (my_assert(!vad_maps,
+		make_static_mesg("vad_maps is NULL")))
+        goto out;
+    GHashTable *vad_map;
+    for (guint i = 0; i < vad_maps->len; ++i)
+    {
+        vad_map = g_ptr_array_index(vad_maps, i);
+        page_info_t *info;
+        ulong _pagesize = VMI_PS_4KB; //safe default
+        addr_t addr = 0;
+        addr_t start = (addr_t)json_node_get_int(g_hash_table_lookup(vad_map, "Start"));
+		if (start != pid_event->vad_pe_start)
+			continue;
+        addr_t end = (addr_t)json_node_get_int(g_hash_table_lookup(vad_map, "End"));
+        trace_ntdll("building userspace: start=0x%lx end=0x%lx pid=%d fnwd={%s}",
+                start, end, pid_event->pid,
+                json_node_get_string(g_hash_table_lookup(vad_map, "FileNameWithDevice"))
+                );
+
+        for (addr = start; addr <= end; addr += _pagesize)
+        {
+            //info is stored in three hash tables. but should only be freed once
+            info = g_slice_new0(page_info_t);
+            if (VMI_SUCCESS != vmi_pagetable_lookup_extended(vmi, pid_event->cr3, addr, info))
+            {
+                //page is not yet present, but we still need the page size
+                if (info->x86_ia32e.pte_location) _pagesize = VMI_PS_4KB;
+                else if (info->x86_ia32e.pgd_location) _pagesize = VMI_PS_2MB;
+                else /*if (info->x86_ia32e.pdpte_location)*/ _pagesize = VMI_PS_1GB;
+                trace_ntdll_debug2("page is not yet present: vaddr=0x%lx size=0x%lx", addr, _pagesize);
+                g_slice_free(page_info_t, info);
+            }
+            else
+            {
+                _pagesize = info->size;
+                gpointer key = GINT_TO_POINTER(info->paddr);
+                if (!g_hash_table_contains(map, key))
+                {
+                    trace_ntdll_debug1("adding imagebase address: paddr=0x%lx pid=%d fnwd={%s}",
+                            info->paddr, pid_event->pid,
+                            json_node_get_string(g_hash_table_lookup(vad_map, "FileNameWithDevice"))
+                            );
+                    g_hash_table_insert(map, key, info);
+                    added++;
+                }
+            }
+        }
+    }
+    trace_ntdll("done building userspace: pid=%d", pid_event->pid);
+out:
+    return added;
+}
+
+void trap_ntdll(vmi_instance_t vmi)
+{
+    trace_ntdll("starting trap of ntdll");
+    GHashTableIter iter;
+    gpointer key, value;
+    g_hash_table_iter_init(&iter, ntdll_pa_pages);
+    while (g_hash_table_iter_next(&iter, &key, &value))
+    {
+        page_info_t *info = (page_info_t*)value;
+        page_cat_t cat;
+        switch (info->size)
+        {
+            default:
+            case VMI_PS_4KB:
+                cat = PAGE_CAT_4KB_FRAME;
+                break;
+            case VMI_PS_2MB:
+                cat = PAGE_CAT_2MB_FRAME;
+                break;
+            case VMI_PS_1GB:
+                cat = PAGE_CAT_1GB_FRAME;
+                break;
+        }
+        trace_ntdll_debug1("setting trap: paddr=0x%lx cat=%s",
+                info->paddr, cat2str(cat));
+        monitor_set_trap(vmi, info->paddr, VMI_MEMACCESS_X, 0, cat, 0);
+    }
+    trace_ntdll("finished trap of ntdll");
+}
+
+void destroy_pageinfo(gpointer val) { g_slice_free(page_info_t, val); }
+
+gboolean watch_ntdll(vmi_instance_t vmi)
+{
+    if (ntdll_pa_pages && g_hash_table_size(ntdll_pa_pages) > 0)
+    {
+        trace_ntdll_debug1("ntdll_pa_pages is already setup");
+        return 1;
+    }
+    //setup ntdll_pa_pages as empty since its safe to
+    //call g_hash_table_contains() even if empty
+    ntdll_pa_pages = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, destroy_pageinfo);
+
+    GHashTableIter iter;
+    gpointer key, value;
+    const char *magic_name = "ntdll.dll"; //used to find vad for ntdll.dll
+
+    GHashTable *all_pids = vmi_get_all_pids(vmi);
+    g_hash_table_iter_init(&iter, all_pids);
+    while (g_hash_table_iter_next(&iter, &key, &value))
+    {
+        vmi_pid_t magic_pid = GPOINTER_TO_INT(key);
+        trace_ntdll("scanning ntdll from pid=%d", magic_pid);
+        pid_events_t *cur_pid = add_new_pid(magic_pid);
+        g_hash_table_steal(vmi_events_by_pid, GINT_TO_POINTER(magic_pid));
+        cur_pid->process_name = calloc(1, strlen(magic_name)+1);
+        strcpy(cur_pid->process_name, magic_name);
+        vmi_pid_to_dtb(vmi, magic_pid, &cur_pid->cr3);
+        volatility_vadinfo(magic_pid, global.volatility_cmd_prefix, dump_count);
+        if (find_process_in_vads(vmi, cur_pid, dump_count)) {
+            vadinfo_bundle_t *bundle = g_ptr_array_index(cur_pid->vadinfo_bundles, dump_count);
+            cur_pid->vad_pe_index = bundle->pe_index;
+            __attribute__((unused))
+            int added = build_userspace_page_maps(vmi, cur_pid, ntdll_pa_pages);
+            trace_ntdll("found %d pages in pid=%d, total=%u",
+                    added, magic_pid, g_hash_table_size(ntdll_pa_pages));
+        }
+        trace_ntdll("done scanning ntdll from pid=%d", magic_pid);
+        delete_vadinfo_json(magic_pid, dump_count);
+        destroy_watched_pid(cur_pid);
+        if (g_hash_table_size(ntdll_pa_pages) >= 100)
+            break;
+    }
+    g_hash_table_destroy(all_pids);
+    if (ntdll_pa_pages && g_hash_table_size(ntdll_pa_pages) > 0)
+    {
+        trap_ntdll(vmi);
+        return 1;
+    }
+    return 0;
+}
+
+void destroy_ntdll(void)
+{
+    if (ntdll_pa_pages)
+        g_hash_table_destroy(ntdll_pa_pages);
 }
 
 void cr3_callback_dispatcher(gpointer cb, gpointer user_data)
