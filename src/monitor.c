@@ -28,6 +28,7 @@
 #include <libvmi/libvmi.h>
 #include <libvmi/events.h>
 
+#include <config.h>
 #include <trace.h>
 #include <monitor.h>
 #include <output.h>
