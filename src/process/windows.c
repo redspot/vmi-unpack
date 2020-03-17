@@ -196,6 +196,16 @@ vmi_pid_t vmi_get_eprocess_pid(vmi_instance_t vmi, addr_t process)
     return pid;
 }
 
+char *vmi_get_eprocess_name(vmi_instance_t vmi, addr_t process)
+{
+    if (!process)
+        return NULL;
+
+    addr_t name_offset = process_vmi_windows_rekall.eprocess_pname;
+
+    return vmi_read_str_va(vmi, process + name_offset, 0);
+}
+
 addr_t vmi_get_eprocess_vadroot(vmi_instance_t vmi, addr_t process)
 {
     addr_t curr_vad = 0;
@@ -235,12 +245,7 @@ char *vmi_current_name_windows(vmi_instance_t vmi, vmi_event_t *event)
 
     addr_t process = vmi_current_process_windows(vmi, event);
 
-    if (!process)
-        return NULL;
-
-    addr_t eprocess_pname = process + process_vmi_windows_rekall.eprocess_pname;
-
-    return vmi_read_str_va(vmi, eprocess_pname, 0);
+    return vmi_get_eprocess_name(vmi, process);
 }
 
 vmi_pid_t vmi_current_parent_pid_windows(vmi_instance_t vmi, vmi_event_t *event)

@@ -128,6 +128,7 @@ GHashTable *vmi_get_all_pids_windows(vmi_instance_t vmi);
 addr_t vmi_get_process_by_cr3(vmi_instance_t vmi, addr_t cr3);
 addr_t windows_find_eprocess_pgd(vmi_instance_t vmi, addr_t pgd);
 vmi_pid_t vmi_get_eprocess_pid(vmi_instance_t vmi, addr_t process);
+char *vmi_get_eprocess_name(vmi_instance_t vmi, addr_t process);
 addr_t vmi_get_eprocess_vadroot(vmi_instance_t vmi, addr_t process);
 
 #endif
