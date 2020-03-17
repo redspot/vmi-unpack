@@ -9,3 +9,4 @@
 *.gcno
 *.gcov
 *.o
+unpack.cfg
