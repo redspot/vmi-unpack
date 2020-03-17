@@ -28,6 +28,7 @@
 #include <libvmi/libvmi.h>
 #include <libvmi/events.h>
 
+#include <trace.h>
 #include <monitor.h>
 #include <output.h>
 #include <paging/intel_64.h>
