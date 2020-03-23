@@ -689,6 +689,9 @@ gboolean watch_ntdll(vmi_instance_t vmi)
     while (g_hash_table_iter_next(&iter, &key, &value))
     {
         vmi_pid_t magic_pid = GPOINTER_TO_INT(key);
+        //do not scan any pid that we intentionally added
+        if (g_hash_table_contains(vmi_events_by_pid, GINT_TO_POINTER(magic_pid)))
+            continue;
         trace_ntdll("scanning ntdll from pid=%d", magic_pid);
         pid_events_t *cur_pid = add_new_pid(magic_pid);
         g_hash_table_steal(vmi_events_by_pid, GINT_TO_POINTER(magic_pid));
