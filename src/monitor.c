@@ -148,7 +148,11 @@ void monitor_set_trap(vmi_instance_t vmi, addr_t paddr, vmi_mem_access_t access,
                 !(pid_event->flags & MONITOR_HIGH_ADDRS) &&
                 vaddr > 4096 &&
                 !addr_in_range(vaddr, pid_event->vad_pe_start, pid_event->vad_pe_size))
+        {
+            trace_trap("trace_trap paddr=0x%lx vaddr=0x%lx pid=%d cat=%s mesg=%s",
+                paddr, vaddr, pid, cat2str(cat), "skip trap, not in imagebase");
             return;
+        }
         trap = g_slice_new(trapped_page_t);
         trap->pid = pid;
         trap->cat = cat;
@@ -157,7 +161,8 @@ void monitor_set_trap(vmi_instance_t vmi, addr_t paddr, vmi_mem_access_t access,
         vmi_set_mem_event(vmi, GFN_SHIFT(paddr), access, 0);
         if (pid_event)
             g_hash_table_add(pid_event->wr_traps, (gpointer)paddr);
-        trace_trap(paddr, trap, "new trap");
+        trace_trap("trace_trap paddr=0x%lx vaddr=0x%lx pid=%d cat=%s mesg=%s",
+            paddr, vaddr, pid, cat2str(cat), "new trap");
     }
 }
 
@@ -253,9 +258,13 @@ void monitor_untrap_vma(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid, m
     exec_map = g_hash_table_lookup(my_pid_events->write_exec_map, (gpointer)vma.base_va);
     if (!exec_map)
     {
-        trace_exec_trap("WARNING - Could not find exec_map for pid",
+        trace_exec_trap(
+            "trace_exec_trap:pid=%d base_va=0x%lx paddr=0x%lx vaddr=0x%lx"
+            " pid_events=%p write_exec_map=%p exec_map=%p"
+            " mesg:%s",
             pid, vma.base_va, paddr, vaddr,
-            my_pid_events, my_pid_events->write_exec_map, exec_map);
+            my_pid_events, my_pid_events->write_exec_map, exec_map,
+            "WARNING - Could not find exec_map for pid");
         vmi_set_mem_event(vmi, event->mem_event.gfn, VMI_MEMACCESS_N, 0);
         return;
     }
@@ -313,9 +322,13 @@ void monitor_trap_vma(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid, mem
             page_cat_t cat = PAGE_CAT_4KB_FRAME;
             char mesg[80] = {0};
             snprintf(mesg, 80, "ADDED new exec_map for pid: rip=0x%lx", event->x86_regs->rip);
-            trace_exec_trap(mesg,
+            trace_exec_trap(
+                "trace_exec_trap:pid=%d base_va=0x%lx paddr=0x%lx vaddr=0x%lx"
+                " pid_events=%p write_exec_map=%p exec_map=%p"
+                " mesg:ADDED new exec_map for pid: rip=0x%lx",
                 pid, vma.base_va, paddr, vaddr,
-                my_pid_events, my_pid_events->write_exec_map, exec_map);
+                my_pid_events, my_pid_events->write_exec_map, exec_map,
+                event->x86_regs->rip);
             //trapped_pages key is full physical address
             trapped_page_t *trap = g_hash_table_lookup(trapped_pages, (gpointer)paddr);
             if (trap)
@@ -890,7 +903,7 @@ event_response_t monitor_handler(vmi_instance_t vmi, vmi_event_t *event)
     if (trap == NULL)
     {
         fprintf(stderr, "WARNING: Monitor - Failed to find PID for physical address 0x%lx\n", paddr);
-        trace_trap(paddr, trap, "trap not found");
+        trace_trap("trace_trap paddr=0x%lx vaddr=0x%lx : trap not found", paddr, vaddr);
         monitor_unset_trap(vmi, paddr);
         return VMI_EVENT_RESPONSE_NONE;
     }
@@ -919,7 +932,8 @@ event_response_t monitor_handler(vmi_instance_t vmi, vmi_event_t *event)
             snprintf(mesg, len - 1, "=pid_change curr_name=%s curr_pid=%d access=%s",
                      curr_name, curr_pid, access2str(event));
             free(curr_name);
-            trace_trap(paddr, trap, mesg);
+            trace_trap("trace_trap paddr=0x%lx vaddr=0x%lx pid=%d cat=%s mesg=%s",
+                paddr, vaddr, pid, cat2str(trap->cat), mesg);
             pid = trap->pid = curr_pid;
         }
         else
@@ -944,7 +958,8 @@ event_response_t monitor_handler(vmi_instance_t vmi, vmi_event_t *event)
                     snprintf(mesg, len - 1, "=unknown_pid curr_name=%s curr_pid=%d access=%s",
                              curr_name, curr_pid, access2str(event));
                     free(curr_name);
-                    trace_trap(paddr, trap, mesg);
+                    trace_trap("trace_trap paddr=0x%lx vaddr=0x%lx pid=%d cat=%s mesg=%s",
+                        paddr, vaddr, pid, cat2str(trap->cat), mesg);
                     pending_rescan_t *retrap = make_retrap(paddr, vaddr, pid, trap->cat, event->mem_event.out_access);
                     untrap_and_schedule_retrap(vmi, pending_page_retrap, retrap);
                     return VMI_EVENT_RESPONSE_NONE;
@@ -953,7 +968,8 @@ event_response_t monitor_handler(vmi_instance_t vmi, vmi_event_t *event)
             else
             {
                 //trapped_pages has this page, but we dont care about it. forget it.
-                trace_trap(paddr, trap, "forget this");
+                trace_trap("trace_trap paddr=0x%lx vaddr=0x%lx pid=%d cat=%s mesg=%s",
+                    paddr, vaddr, pid, cat2str(trap->cat), "forget this");
                 monitor_unset_trap(vmi, paddr);
                 return VMI_EVENT_RESPONSE_NONE;
             }

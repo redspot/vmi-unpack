@@ -71,33 +71,10 @@ inline void die(void *data) { kill(getpid(), SIGINT); }
      __mesg; \
      })
 
-//#define TRACE_TRAPS
-
-#ifdef TRACE_TRAPS
-#define trace_trap(addr, trap, mesg) fprintf(stderr, \
-        "%s:trace_trap paddr=%p vaddr=%p pid=%d cat=%s mesg=%s\n", \
-        __FUNCTION__, (gpointer)addr, (gpointer)trap->vaddr, trap->pid, cat2str(trap->cat), mesg)
-#else
-#define trace_trap(addr, trap, mesg)
-#endif
-
-//#define TRACE_EXEC_TRAP
-
-#ifdef TRACE_EXEC_TRAP
-#define trace_exec_trap(mesg, pid, base_va, paddr, vaddr, pid_evt, wx_map, exec_map) \
-    fprintf(stderr, \
-    "%s:trace_exec_map %s\n" \
-    "%s:trace_exec_map pid=%d base_va=0x%lx paddr=0x%lx vaddr=0x%lx\n" \
-    "%s:trace_exec_map pid_events=%p write_exec_map=%p exec_map=%p\n" \
-    , __func__, mesg, \
-    __func__, pid, base_va, paddr, vaddr, \
-    __func__, pid_evt, wx_map, exec_map \
-    )
-#else
-#define trace_exec_trap(...)
-#endif
 
 #define TRACE_STUFF
+//#define TRACE_TRAPS
+//#define TRACE_EXEC_TRAP
 //#define TRACE_UNTRAP_VMA
 //#define TRACE_TRAP_VMA
 //#define TRACE_EXEC
@@ -114,6 +91,18 @@ inline void die(void *data) { kill(getpid(), SIGINT); }
     )
 #else
 #define trace(...)
+#endif
+
+#if defined (TRACE_STUFF) && defined(TRACE_TRAPS)
+#define trace_trap(args...) trace(args)
+#else
+#define trace_trap(args...)
+#endif
+
+#if defined (TRACE_STUFF) && defined(TRACE_EXEC_TRAP)
+#define trace_exec_trap(args...) trace(args)
+#else
+#define trace_exec_trap(args...)
 #endif
 
 #if defined (TRACE_STUFF) && defined(TRACE_UNTRAP_VMA)
