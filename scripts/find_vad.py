@@ -6,10 +6,23 @@ from glob import glob
 import json
 import os
 import os.path
+import re
+
+dump_dir_patt = r'^[0-9]{4}$'
+dump_dir_re = re.compile(dump_dir_patt)
 
 
-def find_vadinfo_files(_pid, sh_glob='vadinfo.000?.{}.json'):
-    return glob(sh_glob.format(_pid))
+def find_vadinfo_files(sh_glob='vadinfo.????.*.json'):
+    return glob(sh_glob)
+
+
+def find_dump_dirs(_path):
+    _dirs = []
+    with os.scandir(_path) as _iter:
+        for entry in _iter:
+            if entry.is_dir() and dump_dir_re.match(entry.name):
+                _dirs.append(entry.name)
+    return _dirs
 
 
 def parse_vadinfo(fn):
@@ -19,29 +32,30 @@ def parse_vadinfo(fn):
     return (vads, res)
 
 
-def find_orig_exe(fn, vads, glob_tmpl='{}.????????.0x{:016x}-0x{:016x}.dmp'):
+def find_orig_exe(stem, vads, glob_tmpl='{}.????????.0x{:016x}-0x{:016x}.dmp'):
     exe_fn = None
+    fn_re = re.compile(r'\\' + stem + r'[^\\]*.exe')
     for vad in vads:
-        if fn in vad['FileNameWithDevice']:
-            exe_fn = glob_tmpl.format(fn[:14], vad['Start'], vad['End'])
+        if fn_re.search(vad['FileNameWithDevice']):
+            fn = (f'{stem}.exe')[:14]
+            exe_fn = glob_tmpl.format(fn, vad['Start'], vad['End'])
             break
     return exe_fn
 
 
 @click.command()
 @click.argument('dump_path')
-@click.argument('pid')
-def main(dump_path, pid):
+def main(dump_path):
     orig_pwd = os.getcwd()
     os.chdir(dump_path)
-    vadinfo_fns = find_vadinfo_files(pid)
+    vadinfo_fns = find_vadinfo_files()
     assert len(vadinfo_fns) > 0
     my_vads = {}
     for vinfo in vadinfo_fns:
         key = vinfo.split('.')[1]
         my_vads[key] = lambda: None  # make a simple object
         my_vads[key].vads, _ = parse_vadinfo(vinfo)
-    for path in glob('000?'):
+    for path in find_dump_dirs(dump_path):
         if path not in my_vads:
             continue
         any_dmp = os.path.join(dump_path, path, '*.dmp')
@@ -49,12 +63,12 @@ def main(dump_path, pid):
         if dmps and len(dmps):
             dmp_fn = os.path.basename(dmps[0])
             exe_stem, _ = dmp_fn.split('.', 1)
-            orig_name = f"{exe_stem}.exe"
-            exe_glob = find_orig_exe(orig_name, my_vads[path].vads)
-            full_glob = os.path.join(dump_path, path, exe_glob)
-            found = glob(full_glob)
-            if found and len(found) == 1:
-                print(found[0])
+            exe_glob = find_orig_exe(exe_stem, my_vads[path].vads)
+            if exe_glob is not None:
+                full_glob = os.path.join(dump_path, path, exe_glob)
+                found = glob(full_glob)
+                if found and len(found) == 1:
+                    print(found[0])
     os.chdir(orig_pwd)
 
 
