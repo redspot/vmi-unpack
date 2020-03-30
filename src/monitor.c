@@ -66,7 +66,7 @@ int check_prev_vma(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid, addr_t
 
     if (!vma.size)
     {
-        fprintf(stderr, "WARNING: Monitor - Could not find VMA for virtual address 0x%lx\n", vaddr);
+        log_info("WARNING: Monitor - Could not find VMA for virtual address 0x%lx", vaddr);
         return 1;
     }
 
@@ -243,14 +243,14 @@ void monitor_untrap_vma(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid, m
 
     if (!vma.size)
     {
-        fprintf(stderr, "WARNING: monitor_untrap_vma - Could not find VMA for virtual address 0x%lx\n", vaddr);
+        log_info("WARNING: monitor_untrap_vma - Could not find VMA for virtual address 0x%lx", vaddr);
         return;
     }
 
     my_pid_events = g_hash_table_lookup(vmi_events_by_pid, GINT_TO_POINTER(pid));
     if (!my_pid_events)
     {
-        fprintf(stderr, "WARNING: monitor_untrap_vma - Could not find PID %d\n", pid);
+        log_info("WARNING: monitor_untrap_vma - Could not find PID %d", pid);
         return;
     }
     exec_map = g_hash_table_lookup(my_pid_events->write_exec_map, (gpointer)vma.base_va);
@@ -266,7 +266,7 @@ void monitor_untrap_vma(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid, m
         vmi_set_mem_event(vmi, event->mem_event.gfn, VMI_MEMACCESS_N, 0);
         return;
     }
-    trace_untrap_vma("pid=%d, base_va=0x%lx, paddr=0x%lx, vaddr=0x%lx\n",
+    trace_untrap_vma("pid=%d, base_va=0x%lx, paddr=0x%lx, vaddr=0x%lx",
             pid, vma.base_va, paddr, vaddr);
     page_cat_t cat = PAGE_CAT_4KB_FRAME;
     trapped_page_t *trap = g_hash_table_lookup(trapped_pages, (gpointer)paddr);
@@ -297,13 +297,13 @@ void monitor_trap_vma(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid, mem
     addr_t vaddr = event->mem_event.gla;
     if (!vma.size)
     {
-        fprintf(stderr, "WARNING:%s-Could not find VMA: vaddr=0x%lx paddr=0x%lx\n",
-                __FUNCTION__, vaddr, paddr);
+        log_info("WARNING: Could not find VMA: vaddr=0x%lx paddr=0x%lx",
+                vaddr, paddr);
         return;
     }
     if (vma.base_va >= KERNEL_MARK)
     {
-        fprintf(stderr, "WARNING: monitor_trap_vma - Tried to trap kernel pages, request ignored\n");
+        log_info("WARNING: monitor_trap_vma - Tried to trap kernel pages, request ignored");
         return;
     }
     pid_events_t *my_pid_events = g_hash_table_lookup(vmi_events_by_pid, GINT_TO_POINTER(pid));
@@ -511,13 +511,13 @@ void monitor_trap_table(vmi_instance_t vmi, pid_events_t *pid_event)
 
     if (pid_event->pid == 0)
     {
-        fprintf(stderr, "ERROR: Monitor - Trapping PID 0 is not allowed\n");
+        log_error("ERROR: Monitor - Trapping PID 0 is not allowed");
         return;
     }
 
     if (dtb == 0)
     {
-        fprintf(stderr, "ERROR: Monitor - Failed to find DTB for PID %d\n", pid_event->pid);
+        log_error("ERROR: Monitor - Failed to find DTB for PID %d", pid_event->pid);
         return;
     }
 
@@ -538,8 +538,8 @@ void process_pending_rescan(gpointer data, gpointer user_data)
     addr_t vaddr = rescan->vaddr;
     addr_t index;
 
-    //fprintf(stderr, "%s: paddr=0x%lx pid=%d cat=%s\n",
-    //    __FUNCTION__, rescan->paddr, rescan->pid, cat2str(rescan->cat));
+    //log_info("paddr=0x%lx pid=%d cat=%s",
+    //        rescan->paddr, rescan->pid, cat2str(rescan->cat));
     const page_cat_t cat = rescan->cat;
     switch (cat)
     {
@@ -754,7 +754,7 @@ void print_events_by_pid(void)
     {
         vmi_pid_t pid = GPOINTER_TO_INT(key);
         pid_events_t *pid_event = value;
-        fprintf(stderr, "%s: events_by_pid, pid=%d cr3=0x%lx\n", __FUNCTION__, pid, pid_event->cr3);
+        log_info("events_by_pid, pid=%d cr3=0x%lx", pid, pid_event->cr3);
     }
 }
 
@@ -767,7 +767,7 @@ void print_cr3_to_pid(void)
     {
         reg_t cr3 = (long)key;
         vmi_pid_t pid = GPOINTER_TO_INT(value);
-        fprintf(stderr, "%s: cr3_to_pid, pid=%d cr3=0x%lx\n", __FUNCTION__, pid, cr3);
+        log_info("cr3_to_pid, pid=%d cr3=0x%lx", pid, cr3);
     }
 }
 
@@ -803,15 +803,15 @@ event_response_t monitor_handler_cr3(vmi_instance_t vmi, vmi_event_t *event)
                 if (!pid_event->process_name)
                 {
                     pid_event->process_name = vmi_current_name(vmi, event);
-                    fprintf(stderr, "%s: pid=%d eprocess=0x%lx name={%s}\n",
-                            __FUNCTION__, pid, pid_event->eprocess, pid_event->process_name);
+                    log_info("pid=%d eprocess=0x%lx name={%s}",
+                            pid, pid_event->eprocess, pid_event->process_name);
                 }
                 volatility_vadinfo(pid, global.volatility_cmd_prefix, dump_count);
                 if (pid_event->pid != pid) //data structure bugfix
                     pid_event->pid = pid;
                 if (find_process_in_vads(vmi, pid_event, dump_count)) {
                   vadinfo_bundle_t *bundle = g_ptr_array_index(pid_event->vadinfo_bundles, dump_count);
-                  fprintf(stderr, "%s: pid=%d pe_index=%d\n", __FUNCTION__, pid, bundle->pe_index);
+                  log_debug("pid=%d pe_index=%d", pid, bundle->pe_index);
                   //if (bundle->parsed_pe)
                   //  show_parsed_pe(bundle->parsed_pe);
                 }
@@ -842,7 +842,7 @@ event_response_t monitor_handler_cr3(vmi_instance_t vmi, vmi_event_t *event)
     if (parent_cb_event != NULL && (parent_cb_event->flags & MONITOR_FOLLOW_CHILDREN))
     {
         monitor_add_page_table(vmi, pid, parent_cb_event->cb, parent_cb_event->flags, 0);
-        fprintf(stderr, "*********** FOUND CHILD: PID %d *****\n", pid);
+        log_info("FOUND CHILD: PID %d", pid);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -862,7 +862,7 @@ event_response_t monitor_handler_cr3(vmi_instance_t vmi, vmi_event_t *event)
         if (!g_hash_table_contains(all_pids, key))
         {
             dead_pids = g_slist_prepend(dead_pids, key);
-            fprintf(stderr, "****** REMOVED DEAD PROCESS: %d ******\n", pid_k);
+            log_info("REMOVED DEAD PROCESS: %d", pid_k);
         }
     }
     g_hash_table_destroy(all_pids);
@@ -905,7 +905,7 @@ event_response_t monitor_handler(vmi_instance_t vmi, vmi_event_t *event)
 
     if (trap == NULL)
     {
-        fprintf(stderr, "WARNING: Monitor - Failed to find PID for physical address 0x%lx\n", paddr);
+        log_info("WARNING: Monitor - Failed to find PID for physical address 0x%lx", paddr);
         trace_trap("trace_trap paddr=0x%lx vaddr=0x%lx : trap not found", paddr, vaddr);
         monitor_unset_trap(vmi, paddr);
         return VMI_EVENT_RESPONSE_NONE;
@@ -916,7 +916,7 @@ event_response_t monitor_handler(vmi_instance_t vmi, vmi_event_t *event)
     if (pid == 0) // pid=0 means its part of ntdll
         pid = curr_pid;
 
-    //printf("monitor_handler:recv_event rip=%p paddr=%p cat=%s access=%s curr_pid=%d\n",
+    //printf("monitor_handler:recv_event rip=%p paddr=%p cat=%s access=%s curr_pid=%d",
     //    (void *) event->x86_regs->rip, (void *) paddr, cat2str(trap->cat), access2str(event), curr_pid);
 
     // If the PID of the current process is not equal to the PID retrieved from trapped_pages, then:
@@ -989,7 +989,7 @@ event_response_t monitor_handler(vmi_instance_t vmi, vmi_event_t *event)
         }
         else
         {
-            fprintf(stderr, "WARNING: Monitor - Failed to find callback event for PID %d\n", pid);
+            log_info("WARNING: Monitor - Failed to find callback event for PID %d", pid);
             monitor_unset_trap(vmi, paddr);
         }
         return VMI_EVENT_RESPONSE_NONE;
@@ -1001,19 +1001,18 @@ event_response_t monitor_handler(vmi_instance_t vmi, vmi_event_t *event)
         if (!vma.size)
         {
             goto after_not_found;
-            char mesg[] = "%s:VMA not found"
-                          ":pid=%d:curr_pid=%d"
-                          ":pid_cr3=0x%lx:event_cr3=0x%lx"
-                          ":pt_lookup,pid_pa=0x%lx,evt_pa=0x%lx"
-                          ":evt_vaddr=0x%lx:evt_paddr=0x%lx"
-                          "\n";
             addr_t pid_pa = 0, evt_pa = 0;
 
             vmi_v2pcache_flush(vmi, my_pid_events->cr3);
             vmi_pagetable_lookup(vmi, my_pid_events->cr3, vaddr, &pid_pa);
             vmi_v2pcache_flush(vmi, event->x86_regs->cr3);
             vmi_pagetable_lookup(vmi, event->x86_regs->cr3, vaddr, &evt_pa);
-            fprintf(stderr, mesg, __FUNCTION__,
+            log_debug("VMA not found"
+					":pid=%d:curr_pid=%d"
+					":pid_cr3=0x%lx:event_cr3=0x%lx"
+					":pt_lookup,pid_pa=0x%lx,evt_pa=0x%lx"
+					":evt_vaddr=0x%lx:evt_paddr=0x%lx"
+					,
                     pid, curr_pid,
                     my_pid_events->cr3, event->x86_regs->cr3,
                     pid_pa, evt_pa,
@@ -1032,8 +1031,8 @@ after_not_found:
                 // this should never happen. only our PID can exec its own userspace pages,
                 // and therefore the VMA should be found
                 curr_name = vmi_current_name(vmi, event);
-                fprintf(stderr, "%s: BUG: trapped execute by unknown PID, pid=%d, name=%s\n",
-                        __FUNCTION__, curr_pid, curr_name);
+                log_error("BUG: trapped execute by unknown PID, pid=%d, name=%s",
+                        curr_pid, curr_name);
                 free(curr_name);
             }
             return VMI_EVENT_RESPONSE_NONE;
@@ -1072,15 +1071,15 @@ after_not_found:
         }
         else
         {
-            fprintf(stderr, "WARNING: Monitor - Caught unexpected memory access %d\n", event->mem_event.out_access);
+            log_info("WARNING: Monitor - Caught unexpected memory access %d", event->mem_event.out_access);
             monitor_unset_trap(vmi, paddr);
         }
         return VMI_EVENT_RESPONSE_NONE;
     }
     else     // page in process's page table
     {
-        //fprintf(stderr, "%s: paddr=0x%lx pid=%d cat=%s access=%s curr_pid=%d\n",
-        //    __FUNCTION__, paddr, pid, cat2str(trap->cat), access2str(event), curr_pid);
+        //log_info("paddr=0x%lx pid=%d cat=%s access=%s curr_pid=%d",
+        //    paddr, pid, cat2str(trap->cat), access2str(event), curr_pid);
         queue_pending_rescan(paddr, vaddr, pid, trap->cat, &pending_page_rescan);
         return (VMI_EVENT_RESPONSE_EMULATE | VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP);
     }
@@ -1090,7 +1089,7 @@ int monitor_init(vmi_instance_t vmi)
 {
     if (vmi_get_page_mode(vmi, 0) != VMI_PM_IA32E)
     {
-        fprintf(stderr, "ERROR: Monitor - Only IA-32e paging is supported at this time\n");
+        log_error("ERROR: Monitor - Only IA-32e paging is supported at this time");
         page_table_monitor_init = 0;
         return 1;
     }
@@ -1108,7 +1107,7 @@ int monitor_init(vmi_instance_t vmi)
     SETUP_MEM_EVENT(&page_table_monitor_event, 0, VMI_MEMACCESS_WX, monitor_handler, 1);
     if (vmi_register_event(vmi, &page_table_monitor_event) != VMI_SUCCESS)
     {
-        fprintf(stderr, "ERROR: Monitor - Failed to register page table event\n");
+        log_error("ERROR: Monitor - Failed to register page table event");
         page_table_monitor_init = 0;
         return 1;
     }
@@ -1117,7 +1116,7 @@ int monitor_init(vmi_instance_t vmi)
     SETUP_SINGLESTEP_EVENT(&page_table_monitor_ss, vcpu_mask, monitor_handler_ss, 1);
     if (vmi_register_event(vmi, &page_table_monitor_ss) != VMI_SUCCESS)
     {
-        fprintf(stderr, "ERROR: Monitor - Failed to register single step event\n");
+        log_error("ERROR: Monitor - Failed to register single step event");
         vmi_clear_event(vmi, &page_table_monitor_event, NULL);
         page_table_monitor_init = 0;
         return 1;
@@ -1126,7 +1125,7 @@ int monitor_init(vmi_instance_t vmi)
     SETUP_REG_EVENT(&page_table_monitor_cr3, CR3, VMI_REGACCESS_W, 0, monitor_handler_cr3);
     if (vmi_register_event(vmi, &page_table_monitor_cr3) != VMI_SUCCESS)
     {
-        fprintf(stderr, "ERROR: Monitor - Failed to register CR3 monitoring event\n");
+        log_error("ERROR: Monitor - Failed to register CR3 monitoring event");
         vmi_clear_event(vmi, &page_table_monitor_event, NULL);
         vmi_clear_event(vmi, &page_table_monitor_ss, NULL);
         page_table_monitor_init = 0;
@@ -1142,14 +1141,14 @@ int monitor_init(vmi_instance_t vmi)
 
 void monitor_destroy(vmi_instance_t vmi)
 {
-    fprintf(stderr, "monitor_destroy() called\n");
+    log_debug("monitor_destroy() called");
     if (!page_table_monitor_init)
         return;
 
     vmi_clear_event(vmi, &page_table_monitor_cr3, NULL);
     vmi_clear_event(vmi, &page_table_monitor_event, NULL);
     vmi_clear_event(vmi, &page_table_monitor_ss, NULL);
-    fprintf(stderr, "monitor_destroy() events cleared\n");
+    log_debug("monitor_destroy() events cleared");
 
     g_hash_table_destroy(trapped_pages);
     g_hash_table_destroy(cr3_to_pid);
@@ -1165,19 +1164,19 @@ void monitor_add_page_table(vmi_instance_t vmi, vmi_pid_t pid, page_table_monito
 {
     if (cb == NULL)
     {
-        fprintf(stderr, "ERROR: Monitor - Must specify callback function, cannot be null.\n");
+        log_error("ERROR: Monitor - Must specify callback function, cannot be null.");
         return;
     }
 
     if (!page_table_monitor_init)
     {
-        fprintf(stderr, "ERROR: Monitor - Not initialized, cannot add page table\n");
+        log_error("ERROR: Monitor - Not initialized, cannot add page table");
         return;
     }
 
     if (g_hash_table_contains(vmi_events_by_pid, GINT_TO_POINTER(pid)))
     {
-        fprintf(stderr, "ERROR: Monitor - Callback already registered for PID %d\n", pid);
+        log_error("ERROR: Monitor - Callback already registered for PID %d", pid);
         return;
     }
 
@@ -1216,11 +1215,11 @@ void monitor_remove_page_table(vmi_instance_t vmi, vmi_pid_t pid)
 
     if (!page_table_monitor_init)
     {
-        fprintf(stderr, "ERROR: Monitor - Not initialized, cannot remove page table\n");
+        log_error("ERROR: Monitor - Not initialized, cannot remove page table");
         return;
     }
 
-    fprintf(stderr, "%s: pid=%d\n", __FUNCTION__, pid);
+    log_info("pid=%d", pid);
     my_pid_events = g_hash_table_lookup(vmi_events_by_pid, GINT_TO_POINTER(pid));
     if (my_pid_events)
     {
