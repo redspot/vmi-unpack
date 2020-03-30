@@ -24,6 +24,7 @@
 #define TRACE_H
 
 #include <unistd.h>
+#include <signal.h>
 #include <time.h>
 
 typedef void (*assert_callable)(void *data);
@@ -83,6 +84,33 @@ inline void die(void *data) { kill(getpid(), SIGINT); }
      __mesg; \
      })
 
+#define log_stuff(fmt, ...) \
+    fprintf(stderr, \
+    "%s %s[%d]:"#fmt"\n" \
+    , make_timestamp(), __func__, __LINE__, ##__VA_ARGS__ \
+    )
+
+#define LOG_info
+#define LOG_error
+#define LOG_debug
+
+#ifdef LOG_info
+#define log_info(args...) log_stuff(args)
+#else
+#define log_info(...)
+#endif
+
+#ifdef LOG_error
+#define log_error(args...) log_stuff(args)
+#else
+#define log_error(...)
+#endif
+
+#ifdef LOG_debug
+#define log_debug(args...) log_stuff(args)
+#else
+#define log_debug(...)
+#endif
 
 #define TRACE_STUFF
 //#define TRACE_TRAPS
