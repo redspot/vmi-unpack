@@ -24,6 +24,7 @@
 #define TRACE_H
 
 #include <unistd.h>
+#include <time.h>
 
 typedef void (*assert_callable)(void *data);
 
@@ -60,6 +61,17 @@ inline void die(void *data) { kill(getpid(), SIGINT); }
     MY_ASSERT_MACRO_CHOOSER(NULL, ##__VA_ARGS__)(cond, mesg, ##__VA_ARGS__)
 
 #define STATIC_MESG_SIZE 256
+#define TIMESTAMP_FMT "%d%b%Y %T%Z"
+
+#define make_timestamp() \
+    ({ \
+     char __ts[STATIC_MESG_SIZE]={0}; \
+         char *__timestamp_fmt = TIMESTAMP_FMT; \
+         const time_t __tstamp = time(NULL); \
+         strftime(__ts, STATIC_MESG_SIZE-1, \
+                         __timestamp_fmt, localtime(&__tstamp)); \
+     __ts; \
+     })
 
 #define make_static_mesg(fmt, ...) \
     ({ \
@@ -86,8 +98,8 @@ inline void die(void *data) { kill(getpid(), SIGINT); }
 #ifdef TRACE_STUFF
 #define trace(fmt, ...) \
     fprintf(stderr, \
-    "%s[%d]:"#fmt"\n" \
-    , __func__, __LINE__, ##__VA_ARGS__ \
+    "%s %s[%d]:"#fmt"\n" \
+    , make_timestamp(), __func__, __LINE__, ##__VA_ARGS__ \
     )
 #else
 #define trace(...)
