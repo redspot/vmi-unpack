@@ -32,6 +32,7 @@
 
 #include <libvmi/libvmi.h>
 
+#include <trace.h>
 #include <dump.h>
 int capture_cmd(const char *cmd, const char *fn);
 
@@ -207,7 +208,7 @@ void start_dump_thread(char *dir)
 {
     if (dir == NULL)
     {
-        fprintf(stderr, "ERROR: Dump Thread - Cannot start thread with an output dir of NULL\n");
+        log_error("ERROR: Dump Thread - Cannot start thread with an output dir of NULL");
         return;
     }
 
@@ -224,7 +225,7 @@ void start_dump_thread(char *dir)
     // Create semaphore, queue, and hashtable
     if (sem_init(&dump_sem, 0, 0))
     {
-        fprintf(stderr, "ERROR: Dump Thread - Failed to initialize semaphore\n");
+        log_error("ERROR: Dump Thread - Failed to initialize semaphore");
         return;
     }
     dump_queue = g_queue_new();
@@ -330,7 +331,7 @@ void *shell_worker_loop(void *data)
         free(cmd);
         pthread_cond_signal(&shell_cond);
     }
-    fprintf(stderr, "%s:stopping shell worker loop\n", __func__);
+    log_debug("stopping shell worker loop");
     return NULL;
 }
 
@@ -339,7 +340,7 @@ void start_shell_thread(void)
     // Create semaphore, queue, and hashtable
     if (sem_init(&shell_sem, 0, 0))
     {
-        fprintf(stderr, "ERROR: %s - Failed to initialize semaphore\n", __func__);
+        log_error("ERROR: Failed to initialize semaphore");
         return;
     }
     shell_queue = g_queue_new();
