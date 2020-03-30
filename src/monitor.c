@@ -710,7 +710,7 @@ gboolean watch_ntdll(vmi_instance_t vmi)
         trace_ntdll("done scanning ntdll from pid=%d", magic_pid);
         delete_vadinfo_json(magic_pid, dump_count);
         destroy_watched_pid(cur_pid);
-        if (g_hash_table_size(ntdll_pa_pages) >= 100)
+        if (g_hash_table_size(ntdll_pa_pages) >= 200)
             break;
     }
     g_hash_table_destroy(all_pids);
