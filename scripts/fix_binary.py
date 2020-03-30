@@ -45,7 +45,16 @@ def parse_volatility_json(fn):
     return (vads, res)
 
 
-def parse_impscan_json(_dir, _count, _pid):
+def parse_impscan_json(_dir, _count):
+    # first, figure out the pid
+    vadinfo_fns = glob(os.path.join(_dir, f'vadinfo.{int(_count):04}.*.json'))
+    if not vadinfo_fns or not len(vadinfo_fns):
+        raise RuntimeError(f"no vadinfo files match to count={_count}")
+    if len(vadinfo_fns) != 1:
+        raise RuntimeError(f"too many vadinfo files match to count={_count}"
+                           f": {str(vadinfo_fns)}")
+    _, _, _pid, _ = vadinfo_fns[0].split('.', 3)
+    # get OEP and ldrmodules_fn
     suffix = f'{int(_count):04}.{_pid}.json'
     vadinfo_fn = os.path.join(_dir, f'vadinfo.{suffix}')
     _, raw_json = parse_volatility_json(vadinfo_fn)
@@ -57,6 +66,7 @@ def parse_impscan_json(_dir, _count, _pid):
     obj.lookup = defaultdict(dict)
     obj.raw = []
 
+    # combine impscan data into one list
     impscan_glob = os.path.join(_dir, f'impscan.section????.{suffix}')
     for fn in glob(impscan_glob):
         is_list, _ = parse_volatility_json(fn)
@@ -447,10 +457,9 @@ def reconstruct_imports(_ldr_fn, _redir_fn, _impscan_obj):
 @click.argument('new_pe_fn')
 @click.argument('json_dir')
 @click.argument('dump_count')
-@click.argument('pid')
 @click.argument('redirects_fn')
 @click.option('-d', '--debug', is_flag=True)
-def main(pe_fn, new_pe_fn, json_dir, dump_count, pid, redirects_fn, debug):
+def main(pe_fn, new_pe_fn, json_dir, dump_count, redirects_fn, debug):
     if debug:
         Logger.enable()
         Logger.set_level(lief.LOGGING_LEVEL.DEBUG)
@@ -460,7 +469,10 @@ def main(pe_fn, new_pe_fn, json_dir, dump_count, pid, redirects_fn, debug):
         pe_bytes = list(fd.read())
     binary = lief.parse(pe_bytes)
 
-    impscan_obj, ldr_fn, oep = parse_impscan_json(json_dir, dump_count, pid)
+    impscan_obj, ldr_fn, oep = parse_impscan_json(json_dir, dump_count)
+    if not len(impscan_obj.raw):
+        verbose_print("warning: zero import functions found")
+        sys.exit(1337)
     imports_to_add = reconstruct_imports(ldr_fn, redirects_fn, impscan_obj)
     verbose_print(f"found {len(imports_to_add)} libraries with "
                   f"{sum([len(v) for k,v in imports_to_add.items()])}"
@@ -482,6 +494,7 @@ def main(pe_fn, new_pe_fn, json_dir, dump_count, pid, redirects_fn, debug):
     remove_iat_dir(binary)
     patch_iat(binary, impscan_obj)
     save_build(binary, new_pe_fn)
+    sys.exit(0)
 
 
 if __name__ == '__main__':
