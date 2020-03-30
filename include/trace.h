@@ -84,11 +84,14 @@ inline void die(void *data) { kill(getpid(), SIGINT); }
      __mesg; \
      })
 
-#define log_stuff(fmt, ...) \
-    fprintf(stderr, \
+#define __my_fprintf(fd, fmt, ...) \
+    fprintf(fd, \
     "%s %s[%d]:"#fmt"\n" \
     , make_timestamp(), __func__, __LINE__, ##__VA_ARGS__ \
     )
+
+#define log_stuff_fd(fd, args...) __my_fprintf(fd, args)
+#define log_stuff(args...) log_stuff_fd(stderr, args)
 
 #define LOG_info
 #define LOG_error
@@ -96,20 +99,26 @@ inline void die(void *data) { kill(getpid(), SIGINT); }
 
 #ifdef LOG_info
 #define log_info(args...) log_stuff(args)
+#define log_info_fd(args...) log_stuff_fd(args)
 #else
 #define log_info(...)
+#define log_info_fd(args...)
 #endif
 
 #ifdef LOG_error
 #define log_error(args...) log_stuff(args)
+#define log_error_fd(args...) log_stuff_fd(args)
 #else
 #define log_error(...)
+#define log_error_fd(args...)
 #endif
 
 #ifdef LOG_debug
 #define log_debug(args...) log_stuff(args)
+#define log_debug_fd(args...) log_stuff_fd(args)
 #else
 #define log_debug(...)
+#define log_debug_fd(...)
 #endif
 
 #define TRACE_STUFF
@@ -123,12 +132,10 @@ inline void die(void *data) { kill(getpid(), SIGINT); }
 //#define TRACE_NTDLL_DEBUG1
 //#define TRACE_NTDLL_DEBUG2
 
+#define trace_fd(fd, args...) __my_fprintf(fd, args)
+
 #ifdef TRACE_STUFF
-#define trace(fmt, ...) \
-    fprintf(stderr, \
-    "%s %s[%d]:"#fmt"\n" \
-    , make_timestamp(), __func__, __LINE__, ##__VA_ARGS__ \
-    )
+#define trace(args...) trace_fd(stderr, args)
 #else
 #define trace(...)
 #endif
