@@ -34,6 +34,7 @@
 #include <libvmi/peparse.h>
 #include <json-glib/json-glib.h>
 
+#include <trace.h>
 #include <config.h>
 #include <monitor.h>
 #include <dump.h>
@@ -55,14 +56,14 @@ void process_layer(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid, page_c
     mem_seg_t vma = vmi_current_find_segment(vmi, event, event->mem_event.gla);
     if (!vma.size)
     {
-        fprintf(stderr, "WARNING: Unpack - Could not find memory segment for virtual address 0x%lx\n", event->mem_event.gla);
+        log_info("WARNING: Unpack - Could not find memory segment for virtual address 0x%lx", event->mem_event.gla);
         return;
     }
 
     char *buffer = (char *) malloc(vma.size);
     if (!buffer)
     {
-        fprintf(stderr, "ERROR: Unpack - Failed to malloc buffer to dump W2X event\n");
+        log_error("ERROR: Unpack - Failed to malloc buffer to dump W2X event");
         return;
     }
 
@@ -85,7 +86,7 @@ int capture_cmd(const char *cmd, const char *fn)
     pipe = popen(cmd, "r");
     if (pipe == NULL)
     {
-        fprintf(stderr, "%s: failed to run cmd {%s}\n", __func__, cmd);
+        log_error("failed to run cmd {%s}", cmd);
         return -1;
     }
 
@@ -95,14 +96,14 @@ int capture_cmd(const char *cmd, const char *fn)
         out_f = fopen(fn, "w");
         if (!out_f)
         {
-            fprintf(stderr, "%s: error: failed to open {%s} for writing\n", __func__, fn);
+            log_error("error: failed to open {%s} for writing", fn);
             pclose(pipe);
             return -1;
         }
         out_buf = malloc(PAGE_SIZE);
         if (!out_buf)
         {
-            fprintf(stderr, "%s: error: failed to allocate buffer\n", __func__);
+            log_error("error: failed to allocate buffer");
             fclose(out_f);
             pclose(pipe);
             return -1;
@@ -114,7 +115,7 @@ int capture_cmd(const char *cmd, const char *fn)
             if (!out_size)
                 break;
             if (fwrite(out_buf, 1, out_size, out_f) != out_size)
-                fprintf(stderr, "%s: warning: short write to {%s}\n", __func__, fn);
+                log_info("warning: short write to {%s}", fn);
         }
 
         free(out_buf);
@@ -137,8 +138,8 @@ static inline JsonParser* read_json_file(const char* fn)
     parser = json_parser_new();
     if (!json_parser_load_from_file(parser, fn, &error))
     {
-        fprintf(stderr, "%s: error: cannot parse vadinfo json file {%s} %s\n",
-            __func__, fn, error->message);
+        log_error("error: cannot parse vadinfo json file {%s} %s",
+            fn, error->message);
         g_error_free(error);
         g_object_unref(parser);
         return NULL;
@@ -181,11 +182,11 @@ static inline int write_file(const char *fn, const char *data, const size_t len)
     {
         if (!ferror(out_f))
         {
-            fprintf(stderr, "%s: warning: short write to {%s}\n", __func__, fn);
+            log_info("warning: short write to {%s}", fn);
             rc = -(written + 10);
             goto _close;
         }
-        fprintf(stderr, "%s: %s\n", __func__, strerror(errno));
+        log_info("%s", strerror(errno));
         clearerr(out_f);
         rc = -2;
         goto _close;
@@ -258,7 +259,7 @@ int add_rip_to_json(vmi_pid_t pid, int count, reg_t rip)
     obj = json_node_get_object(root);
     if (!json_object_has_member(obj, "rip"))
     {
-        fprintf(stderr, "%s: error: new vadinfo json file does not have member 'rip'\n", __func__);
+        log_error("error: new vadinfo json file does not have member 'rip'");
         rc = -2;
         g_object_unref(parser);
         goto out;
@@ -266,8 +267,8 @@ int add_rip_to_json(vmi_pid_t pid, int count, reg_t rip)
     str_val = (gchar*)json_object_get_string_member(obj, "rip");
     if (!str_val || strcmp(str_val, rip_buf) != 0)
     {
-        fprintf(stderr, "%s: error: new vadinfo json file: expected '%s', got '%s'\n",
-            __func__, rip_buf, str_val);
+        log_error("error: new vadinfo json file: expected '%s', got '%s'",
+            rip_buf, str_val);
         rc = -3;
         g_object_unref(parser);
         goto out;
@@ -294,7 +295,7 @@ void volatility_callback_vaddump(vmi_instance_t vmi, vmi_event_t *event, vmi_pid
     volatility_impscan(vmi, pid_event, base_va, global.volatility_cmd_prefix, dump_count);
 
     oep = event->x86_regs->rip - base_va;
-    fprintf(stderr, "%s: rip=%p base_va=%p oep=%p\n", __func__,
+    log_info("rip=%p base_va=%p oep=%p",
         (void*)event->x86_regs->rip, (void*)base_va, (void*)oep);
     add_rip_to_json(pid, dump_count, oep);
 
@@ -348,7 +349,7 @@ int volatility_vadinfo(vmi_pid_t pid, const char *cmd_prefix, int dump_count)
     // vadinfo
     snprintf(filepath, PATH_MAX - 1, "%s/vadinfo.%04d.%ld.json", output_dir, dump_count, (long)pid);
     snprintf(cmd, cmd_max - 1, vadinfo_cmd, cmd_prefix, domain_name, vol_profile, filepath, (long)pid);
-    fprintf(stderr, "%s: cmd=%s\n", __func__, cmd);
+    log_debug("cmd=%s", cmd);
     queue_and_wait_for_shell_cmd(cmd, stdout_path);
 
     free(cmd);
@@ -377,7 +378,7 @@ int volatility_ldrmodules(vmi_pid_t pid, const char *cmd_prefix, int dump_count)
     // vadinfo
     snprintf(filepath, PATH_MAX - 1, "%s/ldrmodules.%04d.%ld.json", output_dir, dump_count, (long)pid);
     snprintf(cmd, cmd_max - 1, ldrmodules_cmd, cmd_prefix, domain_name, vol_profile, filepath, (long)pid);
-    fprintf(stderr, "%s: cmd=%s\n", __func__, cmd);
+    log_debug("cmd=%s", cmd);
     queue_and_wait_for_shell_cmd(cmd, stdout_path);
 
     free(cmd);
@@ -426,8 +427,8 @@ int volatility_impscan(vmi_instance_t vmi, pid_events_t *pid_event, addr_t base_
     cmd = malloc(cmd_max);
     filepath = malloc(PATH_MAX);
 
-    fprintf(stderr, "%s: base_va=%p, pid=%ld, count=%d\n",
-        __func__, (void*)base_va, (long)pid_event->pid, count);
+    log_debug("base_va=%p, pid=%ld, count=%d",
+        (void*)base_va, (long)pid_event->pid, count);
     //re-parse pe, call find_process_in_vads()
     find_process_in_vads(vmi, pid_event, count);
     vad_bundle = g_ptr_array_index(pid_event->vadinfo_bundles, count);
@@ -435,11 +436,11 @@ int volatility_impscan(vmi_instance_t vmi, pid_events_t *pid_event, addr_t base_
     show_parsed_pe(pe, stderr);
     section_table = pe->section_table;
     num_sections = pe->pe_header->number_of_sections;
-    fprintf(stderr, "%s: num_sections=%zu\n", __func__, num_sections);
+    log_debug("num_sections=%zu", num_sections);
     //for each section with exec
     //  call impscan(eprocess, imagebase + section_rva, size)
     for (s=0; s < num_sections; s++) {
-      fprintf(stderr, "%s: section=%d\n", __func__, s);
+      log_debug("section=%d", s);
       addr_t section_rva = section_table[s].virtual_address;
       size_t section_size = section_table[s].a.virtual_size;
       if (section_size == 0) {
@@ -456,7 +457,7 @@ int volatility_impscan(vmi_instance_t vmi, pid_events_t *pid_event, addr_t base_
           cmd_prefix, domain_name, vol_profile,
           base_va + section_rva, section_size,
           filepath, (long)pid_event->pid);
-      fprintf(stderr, "%s: cmd=%s\n", __func__, cmd);
+      log_debug("cmd=%s", cmd);
       queue_and_wait_for_shell_cmd(cmd, devnull_path);
     }
 
@@ -566,25 +567,25 @@ void show_parsed_pe(parsed_pe_t *pe, FILE* out_fd)
     if (!out_fd)
       out_fd = stderr;
 
-    fprintf(out_fd, "\tSignature: %u.\n", pe->pe_header->signature);
-    fprintf(out_fd, "\tMachine: %u.\n", pe->pe_header->machine);
-    fprintf(out_fd, "\t# of sections: %u.\n", pe->pe_header->number_of_sections);
-    fprintf(out_fd, "\t# of symbols: %u.\n", pe->pe_header->number_of_symbols);
-    fprintf(out_fd, "\tTimestamp: %u.\n", pe->pe_header->time_date_stamp);
-    fprintf(out_fd, "\tCharacteristics: %u.\n", pe->pe_header->characteristics);
-    fprintf(out_fd, "\tOptional header size: %u.\n", pe->pe_header->size_of_optional_header);
-    fprintf(out_fd, "\tOptional header type: 0x%x\n", pe->oh_magic);
+    log_debug_fd(out_fd, "\tSignature: %u.", pe->pe_header->signature);
+    log_debug_fd(out_fd, "\tMachine: %u.", pe->pe_header->machine);
+    log_debug_fd(out_fd, "\t# of sections: %u.", pe->pe_header->number_of_sections);
+    log_debug_fd(out_fd, "\t# of symbols: %u.", pe->pe_header->number_of_symbols);
+    log_debug_fd(out_fd, "\tTimestamp: %u.", pe->pe_header->time_date_stamp);
+    log_debug_fd(out_fd, "\tCharacteristics: %u.", pe->pe_header->characteristics);
+    log_debug_fd(out_fd, "\tOptional header size: %u.", pe->pe_header->size_of_optional_header);
+    log_debug_fd(out_fd, "\tOptional header type: 0x%x", pe->oh_magic);
 
     if (pe->oh_magic == IMAGE_PE32_MAGIC) {
         pe_imagebase = ((struct optional_header_pe32 *)pe->opt_header)->image_base;
     } else {
         pe_imagebase = ((struct optional_header_pe32plus *)pe->opt_header)->image_base;
     }
-    fprintf(out_fd, "\tPE ImageBase: %p\n", (void*)pe_imagebase);
+    log_debug_fd(out_fd, "\tPE ImageBase: %p", (void*)pe_imagebase);
 
     for (c=0; c < pe->pe_header->number_of_sections; c++) {
         // The character array is not null terminated, so only print the first 8 characters!
-        fprintf(out_fd, "\tSection %u: %.8s flags=0x%x\n",
+        log_debug_fd(out_fd, "\tSection %u: %.8s flags=0x%x",
             c+1, pe->section_table[c].short_name, pe->section_table[c].characteristics);
     }
 }
@@ -606,8 +607,8 @@ gboolean parse_pe(vmi_instance_t vmi, pid_events_t *pid_event, parsed_pe_t *pe)
   status = peparse_get_image(vmi, &ctx, MAX_PE_HEADER_SIZE, pe->proc_first_page);
   if (status != VMI_SUCCESS)
   {
-    fprintf(stderr, "%s: error: cannot read PE header from imagebase=%p\n",
-        __func__, (void*)imagebase);
+    log_error("error: cannot read PE header from imagebase=%p",
+        (void*)imagebase);
     free(pe->proc_first_page);
     pe->proc_first_page = NULL;
     return false;
@@ -626,8 +627,8 @@ gboolean parse_pe(vmi_instance_t vmi, pid_events_t *pid_event, parsed_pe_t *pe)
   status = vmi_read(vmi, &ctx, sec_tbl_sz, pe->section_table, NULL);
   if (status != VMI_SUCCESS)
   {
-    fprintf(stderr, "%s: error: cannot read PE section table from imagebase=%p\n",
-        __func__, (void*)imagebase);
+    log_error("error: cannot read PE section table from imagebase=%p",
+        (void*)imagebase);
     free(pe->proc_first_page);
     pe->proc_first_page = NULL;
     free(pe->section_table);
@@ -692,8 +693,8 @@ gboolean find_process_in_vads(vmi_instance_t vmi, pid_events_t *pid_evts, int co
     end = (addr_t)json_node_get_int(g_hash_table_lookup(pe_map, "End"));
     size = end - start;
     pid_evts->vad_pe_size = size;
-    fprintf(stderr, "%s: imagebase=%p pe_index=%d vad_pe_index=%d\n",
-      __func__, (void*)pid_evts->vad_pe_start, vad_bundle->pe_index, pid_evts->vad_pe_index);
+    log_debug("imagebase=%p pe_index=%d vad_pe_index=%d",
+      (void*)pid_evts->vad_pe_start, vad_bundle->pe_index, pid_evts->vad_pe_index);
 
     pe = g_slice_new(parsed_pe_t);
     pe->proc_first_page = NULL;
