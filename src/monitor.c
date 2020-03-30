@@ -149,8 +149,6 @@ void monitor_set_trap(vmi_instance_t vmi, addr_t paddr, vmi_mem_access_t access,
                 vaddr > 4096 &&
                 !addr_in_range(vaddr, pid_event->vad_pe_start, pid_event->vad_pe_size))
         {
-            trace_trap("trace_trap paddr=0x%lx vaddr=0x%lx pid=%d cat=%s mesg=%s",
-                paddr, vaddr, pid, cat2str(cat), "skip trap, not in imagebase");
             return;
         }
         trap = g_slice_new(trapped_page_t);
@@ -316,12 +314,6 @@ void monitor_trap_vma(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid, mem
         {
             exec_map = g_hash_table_new(g_direct_hash, g_direct_equal);
             g_hash_table_insert(my_pid_events->write_exec_map, (gpointer)vma.base_va, exec_map);
-        }
-        if (!g_hash_table_contains(exec_map, (gpointer)event->mem_event.gfn))
-        {
-            page_cat_t cat = PAGE_CAT_4KB_FRAME;
-            char mesg[80] = {0};
-            snprintf(mesg, 80, "ADDED new exec_map for pid: rip=0x%lx", event->x86_regs->rip);
             trace_exec_trap(
                 "trace_exec_trap:pid=%d base_va=0x%lx paddr=0x%lx vaddr=0x%lx"
                 " pid_events=%p write_exec_map=%p exec_map=%p"
@@ -329,6 +321,14 @@ void monitor_trap_vma(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid, mem
                 pid, vma.base_va, paddr, vaddr,
                 my_pid_events, my_pid_events->write_exec_map, exec_map,
                 event->x86_regs->rip);
+        }
+        if (!g_hash_table_contains(exec_map, (gpointer)event->mem_event.gfn))
+        {
+            page_cat_t cat = PAGE_CAT_4KB_FRAME;
+            trace_exec_trap(
+                "trace_exec_trap:pid=%d base_va=0x%lx paddr=0x%lx vaddr=0x%lx"
+                " mesg:ADDED new exec trap for pid: rip=0x%lx",
+                pid, vma.base_va, paddr, vaddr, event->x86_regs->rip);
             //trapped_pages key is full physical address
             trapped_page_t *trap = g_hash_table_lookup(trapped_pages, (gpointer)paddr);
             if (trap)
