@@ -89,11 +89,11 @@ static inline const char *cat2str(page_cat_t cat)
     return catname[cat];
 }
 
-static inline const char *access2str(vmi_event_t *evt)
+static inline const char *access2str(vmi_mem_access_t access)
 {
-    if (evt->mem_event.out_access & VMI_MEMACCESS_X)
+    if (access & VMI_MEMACCESS_X)
         return "VMI_MEMACCESS_X";
-    if (evt->mem_event.out_access & VMI_MEMACCESS_W)
+    if (access & VMI_MEMACCESS_W)
         return "VMI_MEMACCESS_W";
     return "VMI_MEMACCESS_UNKNOWN";
 }

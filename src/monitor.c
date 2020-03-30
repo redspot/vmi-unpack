@@ -161,8 +161,8 @@ void monitor_set_trap(vmi_instance_t vmi, addr_t paddr, vmi_mem_access_t access,
         vmi_set_mem_event(vmi, GFN_SHIFT(paddr), access, 0);
         if (pid_event)
             g_hash_table_add(pid_event->wr_traps, (gpointer)paddr);
-        trace_trap("trace_trap paddr=0x%lx vaddr=0x%lx pid=%d cat=%s mesg=%s",
-            paddr, vaddr, pid, cat2str(cat), "new trap");
+        trace_trap("trace_trap paddr=0x%lx vaddr=0x%lx pid=%d cat=%s access=%s mesg=%s",
+            paddr, vaddr, pid, cat2str(cat), access2str(access), "new trap");
     }
 }
 
@@ -933,7 +933,7 @@ event_response_t monitor_handler(vmi_instance_t vmi, vmi_event_t *event)
         {
             curr_name = vmi_current_name(vmi, event);
             snprintf(mesg, len - 1, "=pid_change curr_name=%s curr_pid=%d access=%s",
-                     curr_name, curr_pid, access2str(event));
+                     curr_name, curr_pid, access2str(event->mem_event.out_access));
             free(curr_name);
             trace_trap("trace_trap paddr=0x%lx vaddr=0x%lx pid=%d cat=%s mesg=%s",
                 paddr, vaddr, pid, cat2str(trap->cat), mesg);
@@ -959,7 +959,7 @@ event_response_t monitor_handler(vmi_instance_t vmi, vmi_event_t *event)
                     //our PID has this page and some other PID accessed it as W or X
                     curr_name = vmi_current_name(vmi, event);
                     snprintf(mesg, len - 1, "=unknown_pid curr_name=%s curr_pid=%d access=%s",
-                             curr_name, curr_pid, access2str(event));
+                             curr_name, curr_pid, access2str(event->mem_event.out_access));
                     free(curr_name);
                     trace_trap("trace_trap paddr=0x%lx vaddr=0x%lx pid=%d cat=%s mesg=%s",
                         paddr, vaddr, pid, cat2str(trap->cat), mesg);
