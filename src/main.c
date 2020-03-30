@@ -27,6 +27,7 @@
 
 #include <libvmi/libvmi.h>
 
+#include <trace.h>
 #include <config.h>
 #include <monitor.h>
 #include <dump.h>
@@ -53,7 +54,7 @@ static struct sigaction action;
 static sigset_t my_sigs;
 static void close_handler(int sig)
 {
-    fprintf(stderr, "close_handler() called\n");
+    log_info("close_handler() called");
     interrupted = sig;
 }
 
@@ -85,7 +86,7 @@ event_response_t monitor_pid(vmi_instance_t vmi, vmi_event_t *event)
     vmi_pid_t pid = vmi_current_pid(vmi, event);
     if (pid == process_pid)
     {
-        fprintf(stderr, "*********** FOUND PARENT: PID %d *****\n", pid);
+        log_info("FOUND PARENT: PID %d", pid);
         // monitor_add_page_table(vmi, pid, process_layer, tracking_flags, 0);
         monitor_add_page_table(vmi, pid, volatility_callback_vaddump, tracking_flags, 0);
         monitor_remove_cr3(monitor_pid);
@@ -102,7 +103,7 @@ event_response_t monitor_name(vmi_instance_t vmi, vmi_event_t *event)
     {
         vmi_pid_t pid = vmi_current_pid(vmi, event);
         process_pid = pid;
-        fprintf(stderr, "*********** FOUND PARENT: PID %d *****\n", pid);
+        log_info("FOUND PARENT: PID %d", pid);
         // monitor_add_page_table(vmi, pid, process_layer, tracking_flags, 0);
         monitor_add_page_table(vmi, pid, volatility_callback_vaddump, tracking_flags, 0);
         monitor_remove_cr3(monitor_name);
@@ -183,7 +184,7 @@ int main(int argc, char *argv[])
     // santity checks for volatility
     if (system("which volatility 2>&1 >/dev/null"))
     {
-        fprintf(stderr, "ERROR: Unpack - volatility not found in path.\n");
+        log_error("ERROR: Unpack - volatility not found in path.");
         return EXIT_FAILURE;
     }
 
@@ -219,7 +220,7 @@ int main(int argc, char *argv[])
     if (vmi_init_complete(&vmi, domain_name, VMI_INIT_DOMAINNAME | VMI_INIT_EVENTS, NULL,
                           VMI_CONFIG_GLOBAL_FILE_ENTRY, NULL, NULL) == VMI_FAILURE)
     {
-        fprintf(stderr, "ERROR: libVMI - Failed to initialize libVMI.\n");
+        log_error("ERROR: libVMI - Failed to initialize libVMI.");
         if (vmi != NULL)
         {
             //vmi_destroy(vmi);
@@ -229,7 +230,7 @@ int main(int argc, char *argv[])
 
     if (monitor_init(vmi))
     {
-        fprintf(stderr, "ERROR: Unpack - Failed to initialize monitor\n");
+        log_error("ERROR: Unpack - Failed to initialize monitor");
         vmi_destroy(vmi);
         return EXIT_FAILURE;
     }
@@ -246,7 +247,7 @@ int main(int argc, char *argv[])
     // Initialize various helper methods
     if (!process_vmi_init(vmi, rekall))
     {
-        fprintf(stderr, "ERROR: Unpack - Failed to initialize process VMI\n");
+        log_error("ERROR: Unpack - Failed to initialize process VMI");
         monitor_destroy(vmi);
         vmi_destroy(vmi);
         stop_dump_thread();
@@ -257,9 +258,7 @@ int main(int argc, char *argv[])
     int fifo_fd;
     if (fifo_file_path && (fifo_fd = open(fifo_file_path, O_WRONLY)))
     {
-        fprintf(stderr, "opened fifo %s\n", fifo_file_path);
-        //fprintf(stderr, "writing to fifo %s\n", fifo_file_path);
-        //write(fifo_fd, '\0', 1);
+        log_info("opened fifo %s", fifo_file_path);
         close(fifo_fd);
     }
 
@@ -270,7 +269,7 @@ int main(int argc, char *argv[])
         status = vmi_events_listen(vmi, 500);
         if (status != VMI_SUCCESS)
         {
-            fprintf(stderr, "ERROR: libVMI - Unexpected error while waiting for VMI events, quitting.\n");
+            log_error("ERROR: libVMI - Unexpected error while waiting for VMI events, quitting.");
             interrupted = 1;
         }
 
@@ -286,12 +285,12 @@ int main(int argc, char *argv[])
 
     // Cleanup
     stop_dump_thread();
-    fprintf(stderr, "dump thread stopped\n");
+    log_debug("dump thread stopped");
     stop_shell_thread();
     monitor_destroy(vmi);
     process_vmi_destroy(vmi);
 
     vmi_destroy(vmi);
-    fprintf(stderr, "doing clean exit\n");
+    log_info("doing clean exit");
     return EXIT_SUCCESS;
 }
