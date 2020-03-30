@@ -23,6 +23,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <getopt.h>
+#include <fcntl.h>
 
 #include <libvmi/libvmi.h>
 
@@ -42,6 +43,7 @@ char *rekall = NULL;
 vmi_pid_t process_pid = 0;
 uint8_t tracking_flags = MONITOR_FOLLOW_REMAPPING;
 char *config_file_path = NULL;
+char *fifo_file_path = NULL;
 
 static const char *default_config_path = "./unpack.cfg";
 
@@ -74,6 +76,7 @@ void usage(char *name)
     printf("Optional arguments:\n");
     printf("    -f                       Also follow children created by target process.\n");
     printf("    -l                       Monitor library, heap and stack pages. By default, these are ignored.\n");
+    printf("    -i                       A fifo to write to signalling that the main loop started.\n");
 }
 
 event_response_t monitor_pid(vmi_instance_t vmi, vmi_event_t *event)
@@ -117,7 +120,7 @@ int main(int argc, char *argv[])
     int c;
 
     // Parse arguments
-    while ((c = getopt(argc, argv, "d:r:v:o:p:n:c:fl")) != -1)
+    while ((c = getopt(argc, argv, "d:r:v:o:p:n:c:i:fl")) != -1)
     {
         switch (c)
         {
@@ -147,6 +150,9 @@ int main(int argc, char *argv[])
                 break;
             case 'l':
                 tracking_flags |= MONITOR_HIGH_ADDRS;
+                break;
+            case 'i':
+                fifo_file_path = optarg;
                 break;
             default:
                 usage(argv[0]);
@@ -246,6 +252,15 @@ int main(int argc, char *argv[])
         stop_dump_thread();
         stop_shell_thread();
         return EXIT_FAILURE;
+    }
+
+    int fifo_fd;
+    if (fifo_file_path && (fifo_fd = open(fifo_file_path, O_WRONLY)))
+    {
+        fprintf(stderr, "opened fifo %s\n", fifo_file_path);
+        //fprintf(stderr, "writing to fifo %s\n", fifo_file_path);
+        //write(fifo_fd, '\0', 1);
+        close(fifo_fd);
     }
 
     // Main loop
