@@ -218,7 +218,7 @@ int main(int argc, char *argv[])
     // Initialize libVMI
     vmi_instance_t vmi;
     if (vmi_init_complete(&vmi, domain_name, VMI_INIT_DOMAINNAME | VMI_INIT_EVENTS, NULL,
-                          VMI_CONFIG_GLOBAL_FILE_ENTRY, NULL, NULL) == VMI_FAILURE)
+                          VMI_CONFIG_JSON_PATH, rekall, NULL) == VMI_FAILURE)
     {
         log_error("ERROR: libVMI - Failed to initialize libVMI.");
         if (vmi != NULL)
