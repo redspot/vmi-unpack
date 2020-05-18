@@ -281,18 +281,102 @@ out:
     return rc;
 }
 
+GHashTable** create_impscan_sections_array(size_t nr)
+{
+    GHashTable **impscan_sections = g_malloc(nr * sizeof(GHashTable*));
+    for (int i = 0; i < nr; i++)
+        impscan_sections[i] = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
+    return impscan_sections;
+}
+
+void add_impscan_section_to_array(GHashTable **arr, int index, addr_t base, size_t size)
+{
+    log_debug("base=%p size=%zu", (void*)base, size);
+    gpointer key;
+    gpointer val;
+    key = g_malloc(strlen("base")+1);
+    strcpy(key, "base");
+    val = (gpointer)(long)(base);
+    g_hash_table_insert(arr[index], key, val);
+    key = g_malloc(strlen("size")+1);
+    strcpy(key, "size");
+    val = (gpointer)(long)(size);
+    g_hash_table_insert(arr[index], key, val);
+    log_debug("base=%p size=%zu",
+        (g_hash_table_lookup(arr[index], "base")),
+        (size_t)GPOINTER_TO_INT(g_hash_table_lookup(arr[index], "size"))
+        );
+}
+
+void destroy_impscan_sections_array(GHashTable **arr, size_t nr)
+{
+    for (int i = 0; i < nr; i++)
+        g_hash_table_destroy(arr[i]);
+    g_free(arr);
+}
+
+int add_impscan_sections_to_json(vmi_pid_t pid, int count, GHashTable **arr, size_t nr)
+{
+    char *filepath = NULL;
+    JsonParser *parser = NULL;
+    JsonNode *root = NULL;
+    gchar *data = NULL;
+    gsize len;
+    int rc = 0;
+
+    //build json array
+    JsonArray *impscan_array = json_array_new();
+    for (int i = 0; i < nr; i++)
+    {
+        JsonObject *impscan_obj = json_object_new();
+        addr_t base = GPOINTER_TO_INT(g_hash_table_lookup(arr[i], "base"));
+        json_object_set_int_member(impscan_obj, "base", (gint64)(base));
+        size_t size = GPOINTER_TO_INT(g_hash_table_lookup(arr[i], "size"));
+        json_object_set_int_member(impscan_obj, "size", (gint64)(size));
+        json_array_add_object_element(impscan_array, impscan_obj);
+        log_debug("base=%p size=%zu", (void*)(base), size);
+    }
+    destroy_impscan_sections_array(arr, nr);
+
+    filepath = make_vadinfo_json_fn(pid, count);
+
+    parser = read_json_file(filepath);
+    if (!parser)
+    {
+        rc = -1;
+        goto out;
+    }
+
+    root = json_parser_get_root(parser);
+    json_object_set_array_member(json_node_get_object(root), "impscan", impscan_array);
+
+    data = json_node_to_data(root, &len);
+    //json_array_unref(impscan_array);
+    g_object_unref(parser);
+
+    rc = write_file(filepath, data, len);
+    if (rc < 0)
+        goto out;
+
+out:
+    free(filepath);
+    if (data) g_free(data);
+    return rc;
+}
+
 void volatility_callback_vaddump(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid, page_cat_t page_cat)
 {
     addr_t oep;
     addr_t base_va;
     pid_events_t *pid_event = g_hash_table_lookup(vmi_events_by_pid, GINT_TO_POINTER(pid));
 
-    volatility_vaddump(pid, global.volatility_cmd_prefix, dump_count);
+    //volatility_vaddump(pid, global.volatility_cmd_prefix, dump_count);
     volatility_vadinfo(pid, global.volatility_cmd_prefix, dump_count);
-    volatility_ldrmodules(pid, global.volatility_cmd_prefix, dump_count);
+    //volatility_ldrmodules(pid, global.volatility_cmd_prefix, dump_count);
 
     base_va = pid_event->vad_pe_start;
-    volatility_impscan(vmi, pid_event, base_va, global.volatility_cmd_prefix, dump_count);
+    volatility_impscan(vmi, pid_event, base_va, global.volatility_cmd_prefix, dump_count, 1);
+    libvmi_dump_memory(vmi, pid, dump_count);
 
     oep = event->x86_regs->rip - base_va;
     log_info("rip=%p base_va=%p oep=%p",
@@ -336,7 +420,8 @@ int volatility_vadinfo(vmi_pid_t pid, const char *cmd_prefix, int dump_count)
 
     // vmi_pid_t is int32_t which can be int or long
     // so, for pid, we use %ld and cast to long
-    const char *vadinfo_cmd = "%svolatility -l vmi://%s --profile=%s  vadinfo --output=json --output-file=%s 2>&1 -p %ld";
+    const char *vadinfo_cmd = "%svolatility -l vmi://%s --profile=%s "
+        "vadinfo --output=json --output-file=%s 2>&1 -p %ld";
     const size_t PAGE_SIZE = sysconf(_SC_PAGESIZE);
     char *cmd = NULL;
     const size_t cmd_max = PAGE_SIZE;
@@ -468,7 +553,7 @@ int libvmi_dump_memory_external(vmi_pid_t pid, int dump_count)
     return 0;
 }
 
-int volatility_impscan(vmi_instance_t vmi, pid_events_t *pid_event, addr_t base_va, const char *cmd_prefix, int count)
+int volatility_impscan(vmi_instance_t vmi, pid_events_t *pid_event, addr_t base_va, const char *cmd_prefix, int count, int to_json)
 {
     /*
      *  volatility -l vmi://win7-borg --profile=Win7SP0x64 \
@@ -504,6 +589,7 @@ int volatility_impscan(vmi_instance_t vmi, pid_events_t *pid_event, addr_t base_
     struct section_header *section_table;
     size_t num_sections;
     int s;
+    GHashTable **impscan_sections = NULL;
 
     cmd = malloc(cmd_max);
     filepath = malloc(PATH_MAX);
@@ -520,6 +606,10 @@ int volatility_impscan(vmi_instance_t vmi, pid_events_t *pid_event, addr_t base_
     log_debug("num_sections=%zu", num_sections);
     //for each section with exec
     //  call impscan(eprocess, imagebase + section_rva, size)
+    //  or
+    //  just add the base and size to vadinfo json
+    if (to_json)
+        impscan_sections = create_impscan_sections_array(num_sections);
     for (s=0; s < num_sections; s++) {
       log_debug("section=%d", s);
       addr_t section_rva = section_table[s].virtual_address;
@@ -532,15 +622,25 @@ int volatility_impscan(vmi_instance_t vmi, pid_events_t *pid_event, addr_t base_
           next_sec_rva = section_table[s+1].virtual_address;
         section_size = next_sec_rva - section_rva;
       }
-      snprintf(filepath, PATH_MAX - 1, "%s/impscan.section%04d.%04d.%ld.json",
-          output_dir, s, count, (long)pid_event->pid);
-      snprintf(cmd, cmd_max - 1, impscan_cmd,
-          cmd_prefix, domain_name, vol_profile,
-          base_va + section_rva, section_size,
-          filepath, (long)pid_event->pid);
-      log_debug("cmd=%s", cmd);
-      queue_and_wait_for_shell_cmd(cmd, devnull_path);
+      if (!to_json)
+      {
+          snprintf(filepath, PATH_MAX - 1, "%s/impscan.section%04d.%04d.%ld.json",
+              output_dir, s, count, (long)pid_event->pid);
+          snprintf(cmd, cmd_max - 1, impscan_cmd,
+              cmd_prefix, domain_name, vol_profile,
+              base_va + section_rva, section_size,
+              filepath, (long)pid_event->pid);
+          log_debug("cmd=%s", cmd);
+          queue_and_wait_for_shell_cmd(cmd, devnull_path);
+      }
+      else
+      {
+        log_debug("base=%p size=%zu", (void*)(base_va + section_rva), section_size);
+        add_impscan_section_to_array(impscan_sections, s, base_va + section_rva, section_size);
+      }
     }
+    if (to_json)
+        add_impscan_sections_to_json(pid_event->pid, count, impscan_sections, num_sections);
 
     free(cmd);
     free(filepath);
