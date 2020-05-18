@@ -3,11 +3,11 @@
 
 //config globals for unpack
 config_t global = {
-    .volatility_cmd_prefix = NULL,
+    .volatility_cmd_prefix = "",
 };
 
 //locals
-static GKeyFile *key_file = NULL; 
+static GKeyFile *key_file = NULL;
 
 gboolean load_config_file(char *path)
 {
@@ -24,7 +24,6 @@ gboolean load_config_file(char *path)
     if (!val)
         val = g_strdup("~/bin/");
     global.volatility_cmd_prefix = val;
-        
     return 1;
 }
 
