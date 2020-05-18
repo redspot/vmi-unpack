@@ -387,6 +387,35 @@ int volatility_ldrmodules(vmi_pid_t pid, const char *cmd_prefix, int dump_count)
     return 0;
 }
 
+int libvmi_dump_memory(vmi_pid_t pid, int dump_count)
+{
+    //  vmi-dump-memory win7-borg /path/to/memdump.raw
+
+    // vmi_pid_t is int32_t which can be int or long
+    // so, for pid, we use %ld and cast to long
+    const char *dump_cmd = "/usr/local/bin/vmi-dump-memory %s %s 2>&1";
+    const size_t PAGE_SIZE = sysconf(_SC_PAGESIZE);
+    char *cmd = NULL;
+    const size_t cmd_max = PAGE_SIZE;
+    char *filepath = NULL;
+    char *stdout_path = "/dev/null";
+
+    cmd = malloc(cmd_max);
+    filepath = malloc(PATH_MAX);
+
+    // memdump file
+    snprintf(filepath, PATH_MAX - 1, "%s/memdump.%04d.%ld.raw", output_dir, dump_count, (long)pid);
+    snprintf(cmd, cmd_max - 1, dump_cmd, domain_name, filepath);
+    log_debug("cmd=%s", cmd);
+    //snprintf(filepath, PATH_MAX - 1, "%s/memdump.%04d.%ld.log", output_dir, dump_count, (long)pid);
+    queue_and_wait_for_shell_cmd(cmd, stdout_path);
+
+    free(cmd);
+    free(filepath);
+
+    return 0;
+}
+
 int volatility_impscan(vmi_instance_t vmi, pid_events_t *pid_event, addr_t base_va, const char *cmd_prefix, int count)
 {
     /*
