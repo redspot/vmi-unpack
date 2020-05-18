@@ -387,7 +387,59 @@ int volatility_ldrmodules(vmi_pid_t pid, const char *cmd_prefix, int dump_count)
     return 0;
 }
 
-int libvmi_dump_memory(vmi_pid_t pid, int dump_count)
+int libvmi_dump_memory(vmi_instance_t vmi, vmi_pid_t pid, int dump_count)
+{
+    const size_t PAGE_SIZE = sysconf(_SC_PAGESIZE);
+    char *filepath = NULL;
+    addr_t address = 0;
+    addr_t size = 0;
+    FILE *f = NULL;
+    unsigned char *memory = malloc(PAGE_SIZE);
+
+    filepath = malloc(PATH_MAX);
+
+    // memdump file
+    snprintf(filepath, PATH_MAX - 1, "%s/memdump.%04d.%ld.raw", output_dir, dump_count, (long)pid);
+    log_debug("starting write of VM memory to file: %s\n", filepath);
+    /* open the file for writing */
+    if ((f = fopen(filepath, "w+")) == NULL) {
+        log_error("failed to open file for writing: %s\n", strerror(errno));
+        goto error_exit;
+    }
+    size = vmi_get_max_physical_address(vmi);
+
+    while (address < size) {
+        /* write memory to file */
+        if (VMI_SUCCESS == vmi_read_pa(vmi, address, PAGE_SIZE, memory, NULL)) {
+            /* memory mapped, just write to file */
+            size_t written = fwrite(memory, 1, PAGE_SIZE, f);
+            if (written != PAGE_SIZE) {
+                log_error("failed to write memory to file: %s\n", strerror(errno));
+                goto error_exit;
+            }
+        } else {
+            /* memory not mapped */
+            /* seek to maintain offset with sparse output */
+            int status = fseek(f, PAGE_SIZE, SEEK_CUR);
+            if (status != 0) {
+                log_error("failed to fseek PAGE_SIZE in file: %s\n", strerror(errno));
+                goto error_exit;
+            }
+        }
+        /* move on to the next page */
+        address += PAGE_SIZE;
+    }
+    log_debug("done write of VM memory to file: %s\n", filepath);
+
+error_exit:
+    if (f) fclose(f);
+    free(filepath);
+    free(memory);
+
+    return 0;
+}
+
+int libvmi_dump_memory_external(vmi_pid_t pid, int dump_count)
 {
     //  vmi-dump-memory win7-borg /path/to/memdump.raw
 
