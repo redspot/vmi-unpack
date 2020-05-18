@@ -144,6 +144,11 @@ static inline int addr_in_imagebase(addr_t suspect, pid_events_t *pe)
          : ((acc & ~VMI_MEMACCESS_W) | VMI_MEMACCESS_X) \
     )
 
+/*
+ * VMI_MEMACCESS_W2X is some weird access type used internally
+ * by XEN. we only use it to denote that a page is part of the
+ * process' imagebase.
+ */
 void update_access_map(pid_events_t *pe, addr_t vaddr,
         addr_t paddr, vmi_mem_access_t access_wanted)
 {
@@ -166,6 +171,42 @@ void update_access_map(pid_events_t *pe, addr_t vaddr,
     if (need_insert)
         g_hash_table_insert(pe->access_map,
                 GINT_TO_POINTER(paddr), GINT_TO_POINTER(access));
+}
+
+void disable_traps(vmi_instance_t vmi, GHashTable *access_map)
+{
+    vmi_mem_access_t new_access;
+    vmi_mem_access_t access;
+    addr_t paddr;
+    GHashTableIter iter;
+    gpointer key, val;
+    g_hash_table_iter_init(&iter, access_map);
+    while (g_hash_table_iter_next(&iter, &key, &val))
+    {
+        paddr = (addr_t)key;
+        access = (vmi_mem_access_t)(long)val;
+        new_access = (access & VMI_MEMACCESS_W2X)
+            ? VMI_MEMACCESS_X //we only want X traps on imagebase pages
+            : VMI_MEMACCESS_N;
+        vmi_set_mem_event(vmi, GFN_SHIFT(paddr), new_access, 0);
+    }
+}
+
+void enable_traps(vmi_instance_t vmi, GHashTable *access_map)
+{
+    vmi_mem_access_t new_access;
+    vmi_mem_access_t access;
+    addr_t paddr;
+    GHashTableIter iter;
+    gpointer key, val;
+    g_hash_table_iter_init(&iter, access_map);
+    while (g_hash_table_iter_next(&iter, &key, &val))
+    {
+        paddr = (addr_t)key;
+        access = (vmi_mem_access_t)(long)val;
+        new_access = (access & ~VMI_MEMACCESS_W2X);
+        vmi_set_mem_event(vmi, GFN_SHIFT(paddr), new_access, 0);
+    }
 }
 
 // maintain global trapped_pages hash and set memory traps
@@ -371,6 +412,7 @@ pid_events_t *add_new_pid(vmi_pid_t pid)
     pval->vad_pe_start = HIGH_ADDR_MARK;
     pval->vad_pe_size = 0;
     pval->has_run_once = 0;
+    pval->waiting_for_pt_update = 0;
     return pval;
 }
 
@@ -1001,6 +1043,19 @@ event_response_t monitor_handler(vmi_instance_t vmi, vmi_event_t *event)
                 pending_rescan_t *retrap = make_retrap(paddr, vaddr, pid, trap->cat, event->mem_event.out_access);
                 untrap_and_schedule_retrap(vmi, pending_page_retrap, retrap);
             }
+            else if (my_pid_events->waiting_for_pt_update)
+            {
+                trace_exec("PT_UPDATE: exec in imagebase, enabling traps:"
+                        " rip=0x%lx", event->x86_regs->rip);
+                my_pid_events->waiting_for_pt_update = 0;
+                monitor_trap_table(vmi, my_pid_events);
+                enable_traps(vmi, my_pid_events->access_map);
+                //after traps are re-enabled, we leave this handler with
+                //VMI_EVENT_RESPONSE_NONE.
+                //if there is an actual event at this location, the instruction
+                //that triggered the waiting_for_pt_update, will bounce
+                //and re-enter the handler and be handled properly.
+            }
             else
             {
                 if ((my_pid_events->flags & MONITOR_HIGH_ADDRS) || vaddr < HIGH_ADDR_MARK)
@@ -1027,10 +1082,13 @@ event_response_t monitor_handler(vmi_instance_t vmi, vmi_event_t *event)
     }
     else     // page in process's page table
     {
-        //log_info("paddr=0x%lx pid=%d cat=%s access=%s curr_pid=%d",
-        //    paddr, pid, cat2str(trap->cat), access2str(event), curr_pid);
-        queue_pending_rescan(paddr, vaddr, pid, trap->cat, &pending_page_rescan);
-        return (VMI_EVENT_RESPONSE_EMULATE | VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP);
+        trace_write("PT_UPDATE: write to pagetable, disabling traps:"
+                " rip=0x%lx", event->x86_regs->rip);
+        my_pid_events->waiting_for_pt_update = 1;
+        disable_traps(vmi, my_pid_events->access_map);
+        //once traps are disabled, all page table pages will be set to
+        //VMI_MEMACCESS_N.
+        return VMI_EVENT_RESPONSE_NONE;
     }
 }
 
@@ -1045,7 +1103,7 @@ int monitor_init(vmi_instance_t vmi)
 
     trapped_pages = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, destroy_trapped_page);
     cr3_to_pid = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, NULL);
-    prev_vma = g_hash_table_new_full(g_int_hash, g_int_equal, free, free);
+    //prev_vma = g_hash_table_new_full(g_int_hash, g_int_equal, free, free);
     vmi_events_by_pid = g_hash_table_new_full(g_direct_hash, g_direct_equal,
                         NULL, destroy_watched_pid);
     pending_page_rescan = NULL;
@@ -1061,15 +1119,15 @@ int monitor_init(vmi_instance_t vmi)
         return 1;
     }
 
-    uint32_t vcpu_mask = (1U << vmi_get_num_vcpus(vmi)) - 1;
-    SETUP_SINGLESTEP_EVENT(&page_table_monitor_ss, vcpu_mask, monitor_handler_ss, 1);
-    if (vmi_register_event(vmi, &page_table_monitor_ss) != VMI_SUCCESS)
-    {
-        log_error("ERROR: Monitor - Failed to register single step event");
-        vmi_clear_event(vmi, &page_table_monitor_event, NULL);
-        page_table_monitor_init = 0;
-        return 1;
-    }
+    //uint32_t vcpu_mask = (1U << vmi_get_num_vcpus(vmi)) - 1;
+    //SETUP_SINGLESTEP_EVENT(&page_table_monitor_ss, vcpu_mask, monitor_handler_ss, 1);
+    //if (vmi_register_event(vmi, &page_table_monitor_ss) != VMI_SUCCESS)
+    //{
+    //    log_error("ERROR: Monitor - Failed to register single step event");
+    //    vmi_clear_event(vmi, &page_table_monitor_event, NULL);
+    //    page_table_monitor_init = 0;
+    //    return 1;
+    //}
 
     SETUP_REG_EVENT(&page_table_monitor_cr3, CR3, VMI_REGACCESS_W, 0, monitor_handler_cr3);
     if (vmi_register_event(vmi, &page_table_monitor_cr3) != VMI_SUCCESS)

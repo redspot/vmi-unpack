@@ -151,6 +151,7 @@ typedef struct
     size_t vad_pe_size;
     addr_t eprocess;
     int has_run_once;
+    int waiting_for_pt_update;
 } pid_events_t;
 
 typedef struct
