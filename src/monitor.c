@@ -189,14 +189,15 @@ void monitor_set_trap(vmi_instance_t vmi, addr_t paddr, vmi_mem_access_t access,
         trap = g_slice_new(trapped_page_t);
         trap->pid = pid;
         trap->cat = cat;
-        trap->vaddr = vaddr;
         g_hash_table_insert(trapped_pages, (gpointer)paddr, trap);
         vmi_set_mem_event(vmi, GFN_SHIFT(paddr), access, 0);
         if (pid_event)
-            g_hash_table_add(pid_event->wr_traps, (gpointer)paddr);
+            update_access_map(pid_event, vaddr, paddr, access);
         trace_trap("trace_trap paddr=0x%lx vaddr=0x%lx pid=%d cat=%s access=%s mesg=%s",
             paddr, vaddr, pid, cat2str(cat), access2str(access), "new trap");
     }
+    //always update vaddr
+    trap->vaddr = vaddr;
 }
 
 // remove entries from global trapped_pages hash and remove memory traps
@@ -208,7 +209,7 @@ void monitor_unset_trap(vmi_instance_t vmi, addr_t paddr)
     {
         pid_events_t *my_pid_events = g_hash_table_lookup(vmi_events_by_pid, GINT_TO_POINTER(trap->pid));
         if (my_pid_events)
-            g_hash_table_remove(my_pid_events->wr_traps, (gpointer)paddr);
+            g_hash_table_remove(my_pid_events->access_map, GINT_TO_POINTER(paddr));
     }
     g_hash_table_remove(trapped_pages, (gpointer)paddr);
 }
@@ -269,18 +270,11 @@ event_response_t exec_retrap(vmi_instance_t vmi, vmi_event_t *event)
 
 // after a page that has been written to has also been executed,
 // we "untrap" it by setting all pages in that VMA back to VMI_MEMACCESS_N
-void monitor_untrap_vma(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid, mem_seg_t vma)
+void monitor_untrap_vma(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid)
 {
-    GHashTable *exec_map;
     pid_events_t *my_pid_events;
     addr_t paddr = PADDR_SHIFT(event->mem_event.gfn);
     addr_t vaddr = event->mem_event.gla;
-
-    if (!vma.size)
-    {
-        log_info("WARNING: monitor_untrap_vma - Could not find VMA for virtual address 0x%lx", vaddr);
-        return;
-    }
 
     my_pid_events = g_hash_table_lookup(vmi_events_by_pid, GINT_TO_POINTER(pid));
     if (!my_pid_events)
@@ -288,21 +282,9 @@ void monitor_untrap_vma(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid, m
         log_info("WARNING: monitor_untrap_vma - Could not find PID %d", pid);
         return;
     }
-    exec_map = g_hash_table_lookup(my_pid_events->write_exec_map, (gpointer)vma.base_va);
-    if (!exec_map)
-    {
-        trace_exec_trap(
-            "trace_exec_trap:pid=%d base_va=0x%lx paddr=0x%lx vaddr=0x%lx"
-            " pid_events=%p write_exec_map=%p exec_map=%p"
-            " mesg:%s",
-            pid, vma.base_va, paddr, vaddr,
-            my_pid_events, my_pid_events->write_exec_map, exec_map,
-            "WARNING - Could not find exec_map for pid");
-        vmi_set_mem_event(vmi, event->mem_event.gfn, VMI_MEMACCESS_N, 0);
-        return;
-    }
-    trace_untrap_vma("pid=%d, base_va=0x%lx, paddr=0x%lx, vaddr=0x%lx",
-            pid, vma.base_va, paddr, vaddr);
+    update_access_map(my_pid_events, vaddr, paddr, VMI_MEMACCESS_W);
+    trace_untrap_vma("pid=%d, paddr=0x%lx, vaddr=0x%lx",
+            pid, paddr, vaddr);
     page_cat_t cat = PAGE_CAT_4KB_FRAME;
     trapped_page_t *trap = g_hash_table_lookup(trapped_pages, (gpointer)paddr);
     if (trap)
@@ -321,22 +303,15 @@ void monitor_untrap_vma(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid, m
       trace_untrap_vma("removing X: pid=%d, paddr=0x%lx, vaddr=0x%lx", pid, paddr, vaddr);
       vmi_set_mem_event(vmi, event->mem_event.gfn, VMI_MEMACCESS_W, 0);
     }
-    g_hash_table_remove(exec_map, (gpointer)event->mem_event.gfn);
 }
 
 // a page belonging to the PID has been written to. place an
 // "execute" trap on that page with VMI_MEMACCESS_X
-void monitor_trap_vma(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid, mem_seg_t vma)
+void monitor_trap_vma(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid)
 {
     addr_t paddr = PADDR_SHIFT(event->mem_event.gfn);
     addr_t vaddr = event->mem_event.gla;
-    if (!vma.size)
-    {
-        log_info("WARNING: Could not find VMA: vaddr=0x%lx paddr=0x%lx",
-                vaddr, paddr);
-        return;
-    }
-    if (vma.base_va >= KERNEL_MARK)
+    if (vaddr >= KERNEL_MARK)
     {
         log_info("WARNING: monitor_trap_vma - Tried to trap kernel pages, request ignored");
         return;
@@ -344,44 +319,27 @@ void monitor_trap_vma(vmi_instance_t vmi, vmi_event_t *event, vmi_pid_t pid, mem
     pid_events_t *my_pid_events = g_hash_table_lookup(vmi_events_by_pid, GINT_TO_POINTER(pid));
     if (my_pid_events)
     {
-        GHashTable *exec_map = g_hash_table_lookup(my_pid_events->write_exec_map, (gpointer)vma.base_va);
-        if (!exec_map)
-        {
-            exec_map = g_hash_table_new(g_direct_hash, g_direct_equal);
-            g_hash_table_insert(my_pid_events->write_exec_map, (gpointer)vma.base_va, exec_map);
-            trace_exec_trap(
-                "trace_exec_trap:pid=%d base_va=0x%lx paddr=0x%lx vaddr=0x%lx"
-                " pid_events=%p write_exec_map=%p exec_map=%p"
-                " mesg:ADDED new exec_map for pid: rip=0x%lx",
-                pid, vma.base_va, paddr, vaddr,
-                my_pid_events, my_pid_events->write_exec_map, exec_map,
+        update_access_map(my_pid_events, vaddr, paddr, VMI_MEMACCESS_X);
+        trace_exec_trap(
+                "trace_exec_trap:pid=%d paddr=0x%lx vaddr=0x%lx"
+                " mesg:UPDATE access_map for pid: rip=0x%lx",
+                pid, paddr, vaddr,
                 event->x86_regs->rip);
-        }
-        if (!g_hash_table_contains(exec_map, (gpointer)event->mem_event.gfn))
+        page_cat_t cat = PAGE_CAT_4KB_FRAME;
+        trapped_page_t *trap = g_hash_table_lookup(trapped_pages, (gpointer)paddr);
+        if (trap)
+          cat = trap->cat;
+        // if an instruction writes to the page that it is in,
+        // step past it then put the VMI_MEMACCESS_X on the page
+        if (rip_in_page(event->x86_regs->rip, vaddr, cat))
         {
-            page_cat_t cat = PAGE_CAT_4KB_FRAME;
-            trace_exec_trap(
-                "trace_exec_trap:pid=%d base_va=0x%lx paddr=0x%lx vaddr=0x%lx"
-                " mesg:ADDED new exec trap for pid: rip=0x%lx",
-                pid, vma.base_va, paddr, vaddr, event->x86_regs->rip);
-            //trapped_pages key is full physical address
-            trapped_page_t *trap = g_hash_table_lookup(trapped_pages, (gpointer)paddr);
-            if (trap)
-              cat = trap->cat;
-            //exec_map key is GFN
-            g_hash_table_add(exec_map, (gpointer)event->mem_event.gfn);
-            // if an instruction writes to the page that it is in,
-            // step past it then put the VMI_MEMACCESS_X on the page
-            if (rip_in_page(event->x86_regs->rip, vaddr, cat))
-            {
-              trace_trap_vma("adding X: rip(0x%lx) is in page(0x%lx) cat=%s",
-                  event->x86_regs->rip, vaddr, cat2str(cat));
-              vmi_set_mem_event(vmi, event->mem_event.gfn, VMI_MEMACCESS_N, 0);
-              vmi_step_event(vmi, event, event->vcpu_id, 1, write_retrap);
-            }
-            else
-              vmi_set_mem_event(vmi, event->mem_event.gfn, VMI_MEMACCESS_X, 0);
+          trace_trap_vma("adding X: rip(0x%lx) is in page(0x%lx) cat=%s",
+              event->x86_regs->rip, vaddr, cat2str(cat));
+          vmi_set_mem_event(vmi, event->mem_event.gfn, VMI_MEMACCESS_N, 0);
+          vmi_step_event(vmi, event, event->vcpu_id, 1, write_retrap);
         }
+        else
+          vmi_set_mem_event(vmi, event->mem_event.gfn, VMI_MEMACCESS_X, 0);
     }
 }
 
@@ -391,8 +349,6 @@ void destroy_trapped_page(gpointer val) { g_slice_free(trapped_page_t, val); }
 void destroy_watched_pid(gpointer data)
 {
     pid_events_t *val = (pid_events_t *)data;
-    g_hash_table_destroy(val->write_exec_map);
-    g_hash_table_destroy(val->wr_traps);
     g_hash_table_destroy(val->access_map);
     free(val->process_name);
     if (val->vadinfo_bundles) g_ptr_array_unref(val->vadinfo_bundles);
@@ -407,10 +363,6 @@ pid_events_t *add_new_pid(vmi_pid_t pid)
         return pval;
     pval = g_slice_new(pid_events_t);
     pval->pid = pid;
-    pval->write_exec_map = g_hash_table_new_full(g_direct_hash, g_direct_equal,
-                           NULL, (GDestroyNotify)g_hash_table_destroy);
-    pval->wr_traps = g_hash_table_new_full(g_direct_hash, g_direct_equal,
-                                           NULL, NULL);
     pval->access_map = g_hash_table_new(g_direct_hash, g_direct_equal);
     g_hash_table_insert(vmi_events_by_pid, GINT_TO_POINTER(pid), pval);
     pval->process_name = NULL;
@@ -1034,46 +986,6 @@ event_response_t monitor_handler(vmi_instance_t vmi, vmi_event_t *event)
 
     if (is_userspace_page(trap->cat))
     {
-        mem_seg_t vma = vmi_current_find_segment(vmi, event, vaddr);
-        if (!vma.size)
-        {
-            goto after_not_found;
-            addr_t pid_pa = 0, evt_pa = 0;
-
-            vmi_v2pcache_flush(vmi, my_pid_events->cr3);
-            vmi_pagetable_lookup(vmi, my_pid_events->cr3, vaddr, &pid_pa);
-            vmi_v2pcache_flush(vmi, event->x86_regs->cr3);
-            vmi_pagetable_lookup(vmi, event->x86_regs->cr3, vaddr, &evt_pa);
-            log_debug("VMA not found"
-					":pid=%d:curr_pid=%d"
-					":pid_cr3=0x%lx:event_cr3=0x%lx"
-					":pt_lookup,pid_pa=0x%lx,evt_pa=0x%lx"
-					":evt_vaddr=0x%lx:evt_paddr=0x%lx"
-					,
-                    pid, curr_pid,
-                    my_pid_events->cr3, event->x86_regs->cr3,
-                    pid_pa, evt_pa,
-                    vaddr, paddr
-                   );
-after_not_found:
-
-            // write traps are only set by monitor_set_trap() and exec by monitor_trap_vma()
-            if (event->mem_event.out_access & VMI_MEMACCESS_W)
-            {
-                pending_rescan_t *retrap = make_retrap(paddr, vaddr, pid, trap->cat, event->mem_event.out_access);
-                untrap_and_schedule_retrap(vmi, pending_page_retrap, retrap);
-            }
-            else if (event->mem_event.out_access & VMI_MEMACCESS_X)
-            {
-                // this should never happen. only our PID can exec its own userspace pages,
-                // and therefore the VMA should be found
-                curr_name = vmi_current_name(vmi, event);
-                log_error("BUG: trapped execute by unknown PID, pid=%d, name=%s",
-                        curr_pid, curr_name);
-                free(curr_name);
-            }
-            return VMI_EVENT_RESPONSE_NONE;
-        }
         if (event->mem_event.out_access & VMI_MEMACCESS_X)
         {
             if (ntdll_pa_pages
@@ -1098,13 +1010,13 @@ after_not_found:
                     else { trace_exec("VMI_MEMACCESS_X: address not in range: rip=0x%lx", event->x86_regs->rip); }
                 else { trace_exec("VMI_MEMACCESS_X: address not below HIGH_ADDR_MARK: rip=0x%lx", event->x86_regs->rip); }
                 trace_exec("calling monitor_untrap_vma:VMI_MEMACCESS_X: rip=0x%lx", event->x86_regs->rip);
-                monitor_untrap_vma(vmi, event, pid, vma);
+                monitor_untrap_vma(vmi, event, pid);
             }
         }
         else if (event->mem_event.out_access & VMI_MEMACCESS_W)
         {
             trace_write("calling monitor_trap_vma:VMI_MEMACCESS_W: rip=0x%lx", event->x86_regs->rip);
-            monitor_trap_vma(vmi, event, pid, vma);
+            monitor_trap_vma(vmi, event, pid);
         }
         else
         {
@@ -1264,28 +1176,15 @@ void monitor_remove_page_table(vmi_instance_t vmi, vmi_pid_t pid)
         g_hash_table_remove(cr3_to_pid, (gpointer)my_pid_events->cr3);
         int i;
         //clear userspace traps
-        GHashTableIter iter;
-        gpointer base_va, exec_map;
-        g_hash_table_iter_init(&iter, my_pid_events->write_exec_map);
-        while (g_hash_table_iter_next(&iter, &base_va, &exec_map))
+        guint num_pages = 0;
+        //copy keys into array since we are altering the access_map
+        gpointer *pages = g_hash_table_get_keys_as_array(
+                my_pid_events->access_map, &num_pages);
+        if (pages)
         {
-            guint num_pages = 0;
-            gpointer *pages = g_hash_table_get_keys_as_array(exec_map, &num_pages);
-            if (pages)
-            {
-                for (i = 0; i < num_pages; i++)
-                    monitor_unset_trap(vmi, PADDR_SHIFT((addr_t)pages[i]));
-                g_free(pages);
-            }
-        }
-        //clear write traps
-        guint num_entries = 0;
-        gpointer *entries = g_hash_table_get_keys_as_array(my_pid_events->wr_traps, &num_entries);
-        if (entries)
-        {
-            for (i = 0; i < num_entries; i++)
-                monitor_unset_trap(vmi, (addr_t)entries[i]);
-            g_free(entries);
+            for (i = 0; i < num_pages; i++)
+                monitor_unset_trap(vmi, (addr_t)pages[i]);
+            g_free(pages);
         }
         g_hash_table_remove(vmi_events_by_pid, GINT_TO_POINTER(pid));
     }
