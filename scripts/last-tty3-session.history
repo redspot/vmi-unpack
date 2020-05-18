@@ -1,0 +1,1802 @@
+import json
+results = json.load("calc_upx.exe.vadinfo.json")
+help(json.load)
+help(json)
+results = json.load(open("calc_upx.exe.vadinfo.json", "r"))
+dir(results)
+results.keys()
+type(results.rows)
+type(results['rows'])
+type(results['columns'])
+results['rows'][0]
+help(dict)
+help(zip)
+zip(['a', 'b', 'c'], [1,2,3])
+dict(zip(['a', 'b', 'c'], [1,2,3]))
+vads = []
+vad = dict(zip(results['columns'], results['rows'][0]))
+vad
+vads.append(vad)
+vads = [dict(zip(results['columns'], r)) for r in results['rows']]
+vads
+vads[0]
+vads[0]['Flags']
+vads[0]['FileNameWithDevice']
+[f['FileNameWithDevice'] for f in vads]
+from pprint import pprint
+pprint([f['FileNameWithDevice'] for f in vads])
+pprint([f['Flags'] for f in vads])
+pprint([f['FileNameWithDevice'] for f in vads if 'PrivateMemory' in f['Flags'] ])
+pprint([f['FileNameWithDevice'] for f in vads if 'PrivateMemory' not in f['Flags'] ])
+import readline
+import json
+fn = 'calc_upx.exe.vadinfo.json'
+fd = open(fn, 'r')
+res = json.load(fd)
+res.keys()
+vads = [dict(zip(res['columns'], r)) for r in res['rows']]
+vads[0]
+for vad in vads:
+	if 'calc_upx' in vad['FileNameWithDevice']:
+		print("calc_upx.exe.7d149b30.{:016x}-{:016x}.dmp".format(vad['Start'], vad['End']))
+exe_fn = None
+for vad in vads:
+	if 'calc_upx' in vad['FileNameWithDevice']:
+		exe_fn = "calc_upx.exe.7d149b30.{:016x}-{:016x}.dmp".format(vad['Start'], vad['End'])
+exe_fn
+exe_orig_img = lief.parse(exe_fn)
+import lief
+help(readline)
+readline.write_history_file()
+exe_orig_img
+type(exe_orig_img)
+exe_orig_img = lief.parse(exe_fn)
+type(exe_orig_img)
+exe_fn
+exe_orig_img = lief.PE.parse(exe_fn)
+		exe_fn = "calc_upx.exe.7d149b30.0x{:016x}-0x{:016x}.dmp".format(vad['Start'], vad['End'])
+for vad in vads:
+	if 'calc_upx' in vad['FileNameWithDevice']:
+		exe_fn = "calc_upx.exe.7d149b30.0x{:016x}-0x{:016x}.dmp".format(vad['Start'], vad['End'])
+exe_orig_img = lief.PE.parse(exe_fn)
+type(exe_orig_img)
+exe_orig_img
+dir(exe_orig_img)
+exe_orig_img.sections
+list(exe_orig_img.sections)
+exe_orig_img.sections[0]
+dir(exe_orig_img.sections[0])
+exe_orig_img.sections[0].name
+for s in exe_orig_img.sections:
+	print(s.name)
+dir(exe_orig_img.sections[0])
+vads
+res['Columns']
+res['columns']
+print(exe_orig_img.optional_header)
+vads[0]
+vadd_addr_tmpl = "VADNodeAddress:0x{:016x} Start:0x{:016x} End:0x{:016x} Segment:0x{:016x}"
+vadd_addr_tmpl = "VADNodeAddress:0x{VADNodeAddress:016x} Start:0x{Start:016x} End:0x{End:016x} Segment:0x{Segment:016x}"
+vadd_addr_tmpl.format(vads[0])
+"{VADNodeAddress}".format(vads[0])
+vads[0]['VADNodeAddress']
+"{VADNodeAddress}".format(**vads[0])
+vadd_addr_tmpl.format(**vads[0])
+for vad in vads:
+	if vad['VadType'] != 'VadImageMap':
+		print(vadd_addr_tmpl.format(**vad)
+)
+res['columns']
+dir(exe_orig_img.sections[0])
+exe_orig_img.sections[0].virtual_size
+exe_orig_img.sections[0].virtual_address
+exe_orig_img.sections[0].size
+exe_orig_img.sections[0].offset
+exe_orig_img.sections[0].sizeof_raw_data
+str(exe_orig_img.sections[0])
+hex(229376)
+hex(4096)
+def print_vads(vads=vads):
+	for vad in vads:
+		if vad['VadType'] != 'VadImageMap':
+			print(vadd_addr_tmpl.format(**vad))
+print_vads()
+str(exe_orig_img.sections[0])
+dir(exe_orig_img.sections[0])
+exe_orig_img.sections[0].characteristics
+exe_orig_img.sections[0].characteristics_lists
+res['columns']
+vadd_addr_tmpl
+vadd_addr_tmpl = 'Start:0x{Start:016x} End:0x{End:016x} Prot:{Protection}:'
+print_vads()
+vads[3]
+hex(131072)
+vads[4]
+hex(65536)
+vadd_addr_tmpl = 'Start:0x{Start:016x} End:0x{End:016x} Prot:{Protection}: FN:{FileNameWithDevice}:'
+print_vads()
+help(readline)
+readline.append_history_file()
+readline.append_history_file('~/.history')
+help(readline)
+readline.append_history_file(50)
+print_vads()
+vad_addr_tmpl = 'Start:0x{Start:016x} End:0x{End:016x} Prot:{Protection}: Size:{size:08}'
+sample_fn = 'calc_upx.exe'
+sample_key = '7d149b30'
+json_fn = sample_fn + '.vadinfo.json'
+vads, _ = parse_vadinfo(json_fn)
+_, in_exe = find_orig_exe(sample_fn, sample_key, vads)
+print_vads(vad_addr_tmpl, vads)
+len(vads)
+vads[30]
+hex(8796092956671)
+hex(18446738026450105792)
+hex(18446738026450105680)
+for s in in_exe.sections:
+	print(s)
+in_exe.sections[0]
+in_exe.sections[0].name
+in_exe.sections[0].size
+in_exe.sections[0].virtual_address
+in_exe.sections[0].virtual_size
+print_vads(vad_addr_tmpl, vads)
+for imported_library in in_exe.imports:
+  print("Library name: " + imported_library.name)
+  for func in imported_library.entries:
+    if not func.is_ordinal:
+      print(func.name)
+    print(func.iat_address)
+in_exe.imports
+str(in_exe.imports)
+list(in_exe.imports)
+in_exe.imports[0]
+list(iter(in_exe.imports))
+0x7d149b30
+print_vads(vad_addr_tmpl, vads)
+def print_vads(fmt, vads, show_maps=False):
+    for vad in vads:
+        if show_maps and vad['VadType'] != 'VadImageMap':
+            size = vad['End'] - vad['Start']
+            print(fmt.format(**vad, size=size))
+print_vads(vad_addr_tmpl, vads, False)
+print_vads(vad_addr_tmpl, vads)
+print_vads(vad_addr_tmpl, vads, True)
+def print_vads(fmt, vads, show_maps=False):
+    for vad in vads:
+        if vad['VadType'] == 'VadImageMap' and not show_maps:
+            continue
+        size = vad['End'] - vad['Start']
+        print(fmt.format(**vad, size=size))
+print_vads(vad_addr_tmpl, vads, True)
+0x7d149b30
+print(in_exe.optional_header)
+print(in_exe.dos_header)
+print(in_exe.header)
+res['columns']
+_, res = parse_vadinfo(json_fn)
+res['columns']
+vad_addr_tmpl
+vad_addr_tmpl = 'VAD:0x{VADNodeAddress:016x} ' + vad_addr_tmpl
+print_vads(vad_addr_tmpl, vads)
+for s in in_exe.sections:
+	print(s)
+vad_addr_tmpl
+vad_addr_tmpl = 'Start:0x{Start:016x} End:0x{End:016x} Size:{size:08x}'
+print_vads(vad_addr_tmpl, vads, True)
+vad_addr_tmpl = 'Start:0x{Start:016x} End:0x{End:016x} Size:{size:08x} Size:{size:08}'
+print_vads(vad_addr_tmpl, vads, True)
+def print_vads(fmt, vads, show_maps=False):
+    for vad in vads:
+        if vad['VadType'] == 'VadImageMap' and not show_maps:
+            continue
+        size = vad['End'] - vad['Start'] + 1
+        print(fmt.format(**vad, size=size))
+print_vads(vad_addr_tmpl, vads, True)
+in_exe.sections[0].name
+in_exe.sections[0].size
+in_exe.sections[0].virtual_size
+hex(in_exe.sections[0].size)
+hex(in_exe.sections[0].virtual_size)
+hex(in_exe.sections[0].virtual_address)
+**in_exe.sections[0]
+(**in_exe.sections[0])
+in_exe.sections[0].keys()
+def str_section(_sec):
+	return "name:{name} size:0x{size:x} virtual_size:0x{virtual_size:x} virtual_address:0x{virtual_address:x}".format(**_sec)
+str_section(in_exe.sections[0])
+in_exe.sections[0]
+dir(in_exe.sections[0])
+def str_section(_sec):
+	return "name:{} size:0x{:x} virtual_size:0x{:x} virtual_address:0x{:x}".format(_sec.name, _sec.size, _sec.virtual_size, _sec.virtual_address)
+dir(in_exe.sections[0])
+str_section(in_exe.sections[0])
+for s in in_exe.sections:
+	print(str_section(s))
+vads[0].keys()
+for vad in vads:
+	print(vad['FileNameWithDevice'])
+type(json)
+with open('../win7-borg-rekall.json', 'r') as fd:
+	rekall = json.load(fd)
+type(rekall)
+rekall.keys()
+type(rekall['$STRUCTS'])
+rekall['$STRUCTS']['_EPROCESS'
+]
+rekall['$STRUCTS']['_EPROCESS'].keys()
+len(rekall['$STRUCTS']['_EPROCESS'])
+rekall['$STRUCTS']['_EPROCESS'][0]
+rekall['$STRUCTS']['_EPROCESS'][1]
+rekall['$STRUCTS']['_EPROCESS'][1].keys()
+rekall['$STRUCTS']['_EPROCESS'][1]['Peb']
+rekall['$STRUCTS']['_EPROCESS'][1]['Peb'][0]
+rekall['$STRUCTS']['_PEB'][1]['ImageBaseAddress'][0]
+in_exe.sections[0].virtual_size
+globals().keys()
+vads
+vads[0]
+print_vads(vad_addr_tmpl, vads)
+len(vads)
+vads[30]
+vads[30]['Flags2']
+sample_fn = 'calc_upx.exe'
+sample_key = '7dcb3b30'
+main(sample_fn, sample_key)
+exe_fn
+vad_addr_tmpl = 'Start:0x{Start:016x} End:0x{End:016x} Prot:{Protection}: Size:{size:08}'
+json_fn = sample_fn + '.vadinfo.json'
+vads, res = parse_vadinfo(json_fn)
+exe_fn, in_exe = find_orig_exe(sample_fn, sample_key, vads)
+sample_fn
+print_vads(vad_addr_tmpl, vads)
+0x2f - 0x10
+vads[0]
+[v['FileNameWithDevice'] for v in vads]
+pprint
+from pprint import pprint
+pprint([v['FileNameWithDevice'] for v in vads])
+for vad in vads:
+	size = vad['End'] - vad['Start']
+	print(fmt.format(**vad, size=size))
+vad_addr_tmpl
+vad_addr_tmpl = 'Start:0x{Start:016x} End:0x{End:016x} Prot:{Protection}: Size:{size:08} FN:{FileNameWithDevice}'
+fmt = vad_addr_tmpl
+for vad in vads:
+	size = vad['End'] - vad['Start']
+	print(fmt.format(**vad, size=size))
+hello_mew_0001_json_fn = '/home/wmartin45/borg-out/hello_mew/vadinfo.0001.264.json'
+globals().keys()
+vads, res = parse_vadinfo(hello_mew_0001_json_fn)
+for vad in vads:
+	size = vad['End'] - vad['Start']
+	print(fmt.format(**vad, size=size))
+res
+res.keys()
+res['rip']
+hello_mew_0002_json_fn = '/home/wmartin45/borg-out/hello_mew/vadinfo.0002.264.json'
+vads, res = parse_vadinfo(hello_mew_0002_json_fn)
+res['rip']
+for vad in vads:
+	size = vad['End'] - vad['Start']
+	print(fmt.format(**vad, size=size))
+res['rip']
+res['columns']
+vads[0]['VadType']
+vads[0]['Flags']
+vads[0]['Flags2']
+vads[0]['Tag']
+vads[0]['Control Flags']
+vads[0]['ControlArea']
+vads[1]['Flags']
+vads[2]['Flags']
+vads[3]['Flags']
+vads[4]['Flags']
+vads[6]['Flags']
+vads[6]['FileObject']
+vads[6]['FileNameWithDevice']
+vads[7]['FileNameWithDevice']
+vads[7]['Flags']
+for vad in vads:
+	print(vad['Flags'], vad['FileNameWithDevice'])
+hello_mew_0000_json_fn = '/home/wmartin45/borg-out/hello_mew/vadinfo.0000.264.json'
+mew_vads_0, mew_res_0 = parse_vadinfo(hello_mew_0000_json_fn)
+mew_vads_2, mew_res_2 = parse_vadinfo(hello_mew_0002_json_fn)
+mew_vads_0[0]['Start']
+[v['Start'] for v in mew_vads_0]
+mew_starts_0 = set([v['Start'] for v in mew_vads_0])
+mew_starts_2 = set([v['Start'] for v in mew_vads_2])
+help(mew_starts_2)
+mew_starts_2.difference(mew_starts_0)
+len(mew_starts_2)
+len(mew_starts_0)
+mew_starts_diff = mew_starts_2.difference(mew_starts_0)
+len(mew_starts_diff)
+28 - 15
+def parse_flags(flag_str):
+	flags = {k.strip(): v.strip() for k, v in field.split(':') for field in flag_str.split(',')}
+	return flags
+mew_vads_2[7]['Flags']
+mew_vads_2[6]['Flags']
+parse_flags(mew_vads_2[6]['Flags'])
+def parse_flags(flag_str):
+	return {k.strip(): v.strip() for field in flag_str.split(',') for k, v in field.split(':')}
+parse_flags(mew_vads_2[6]['Flags'])
+[field for field in mew_vads_2[6]['Flags'].split(',')]
+[(k,v) for field in mew_vads_2[6]['Flags'].split(',') for k,v in field.split(':')]
+[field.split(':') for field in mew_vads_2[6]['Flags'].split(',')]
+[(k,v) for k,v in [f.split(':') for f in mew_vads_2[6]['Flags'].split(',')]]
+{k.strip(): v.strip() for k,v in [f.split(':') for f in mew_vads_2[6]['Flags'].split(',')]}
+def parse_flags(flag_str):
+	return {k.strip(): v.strip() for k,v in [field.split(':') for field in flag_str.split(',')]}
+parse_flags(mew_vads_2[6]['Flags'])
+def format_flags(flags):
+    flag_fmt = '{} {}'
+    prot = ' Shared'
+    if 'PrivateMemory' in flags:
+        prot = 'Private'
+    perm = 'RW'
+    if 'NoChange' in flags:
+        perm = 'RO'
+    return flags_fmt.format(perm, prot)
+def parse_flags(flag_str):
+    return {k.strip(): v.strip() for k,v in [field.split(':') for field in flag_str.split(',')]}
+def print_vads(fmt, vads, skip_maps=False, starts_filter=None):
+    for vad in vads:
+        if starts_filter is not None and vad['Start'] not in starts_filter:
+            continue
+        if skip_maps and vad['VadType'] == 'VadImageMap':
+            continue
+        size = vad['End'] - vad['Start']
+        flags_dict = parse_flags(vad['Flags'])
+        pretty_flags = format_flags(flags_dict)
+        print(fmt.format(**vad, size=size, flags=pretty_flags))
+fmt
+mew_fmt = 'Start:0x{Start:016x} End:0x{End:016x} {flags} FN:{FileNameWithDevice}'
+print_vads(mew_fmt, mew_vads_2, starts_filter=mew_vads_diff)
+print_vads(mew_fmt, mew_vads_2, starts_filter=mew_starts_diff)
+def format_flags(flags):
+    flag_fmt = '{} {}'
+    prot = ' Shared'
+    if 'PrivateMemory' in flags:
+        prot = 'Private'
+    perm = 'RW'
+    if 'NoChange' in flags:
+        perm = 'RO'
+    return flag_fmt.format(perm, prot)
+print_vads(mew_fmt, mew_vads_2, starts_filter=mew_starts_diff)
+mew_vads_1, mew_res_1 = parse_vadinfo(hello_mew_0001_json_fn)
+mew_starts_1 = set([v['Start'] for v in mew_vads_1])
+mew_starts_diff_0_2 = mew_starts_2.difference(mew_starts_0)
+mew_starts_diff_0_1 = mew_starts_1.difference(mew_starts_0)
+print_vads(mew_fmt, mew_vads_1, starts_filter=mew_starts_diff_0_1)
+print_vads(mew_fmt, mew_vads_2, starts_filter=mew_starts_diff_0_2, skip_maps=True)
+globals().keys()
+type(vads)
+type(vads[0])
+vad
+vads[0]
+vads[1]
+vads[2]
+vads[3]
+vads[4]
+vads[5]
+vads[6]
+vads[7]
+for v in vads:
+	print("{}:::{}".format(v['VadType'], v['Control Flags'])
+)
+for v in vads:
+	if v['VadType'] == 'VadImageMap':
+		print("{}:::{}".format(v['Protection'], v['FileNameWithDevice']))
+globals().keys()
+res[0]
+res
+res.keys()
+res['rows']
+res['columns']
+vads[6]
+import lief
+hello_unpacked = lief.parse('/home/wmartin45/hello_upx_unpacked.base_0x8e0000.rip_0x8e1627.exe')
+print hello_unpacked.optional_header
+print(hello_unpacked.optional_header)
+hello_unpacked.optional_header
+dir(hello_unpacked.optional_header)
+hello_unpacked.optional_header.addressof_entrypoint
+hex(hello_unpacked.optional_header.addressof_entrypoint)
+for func in hello_unpacked.imported_functions:
+	print(func)
+binary = hello_unpacked
+for imported_library in binary.imports:
+  print("Library name: " + imported_library.name)
+  for func in imported_library.entries:
+    if not func.is_ordinal:
+      print(func.name)
+    print(func.iat_address)
+list(binary.imports)
+list(hello_unpacked.imported_functions)
+builder = lief.PE.Builder(binary)
+builder.build_imports(True)
+builder.patch_imports(True)
+import_lines = open('borg-out/hello_imports.txt', 'r').readlines()
+import_lines[0]
+[l.split('!') for l in import_lines[:10]]
+[l.trim().split('!') for l in import_lines[:10]]
+[l.strip().split('!') for l in import_lines[:10]]
+[(lib,func) for lib, func in [l.strip().split('!') for l in import_lines[:10]] if len(func)]
+from collections import defaultdict
+my_imports = defaultdict(set)
+add_func = lambda lib, func: my_imports[lib].add(func)
+lib_func = [(lib,func) for lib, func in [l.strip().split('!') for l in import_lines[:10]] if len(func)]
+map(add_func, lib_func)
+list(map(add_func, lib_func))
+add_func = lambda kv: my_imports[kv[0]].add(kv[1])
+list(map(add_func, lib_func))
+my_imports
+binary.imports
+list(binary.imports)
+for lib, funcs in my_imports.items():
+list(my_imports)
+for lib in my_imports:
+	for func in my_imports[lib]:
+		print(lib, func)
+for lib in my_imports:
+	if lib not in binary.imports:
+		binary.add_library(lib)
+import readline
+dir(readline)
+readline.write_history_file('~/src/vmi-unpack/fix_imports.py')
+readline.write_history_file('~/src/fix_imports.py')
+readline.write_history_file('~/fix_imports.py')
+help(readline.write_history_file)
+readline.write_history_file('__fix_imports.py')
+import lief
+binary = lief.parse('hello_original.exe')
+binary.imports
+list(binary.imports)
+for imported_library in binary.imports:
+  print("Library name: " + imported_library.name)
+  for func in imported_library.entries:
+    if not func.is_ordinal:
+      print(func.name)
+    print(func.iat_address)
+list(binary.import_functions)[0:4]
+list(binary.imported_functions)[0:4]
+[str(f) for f in binary.imported_functions]
+[dir(f) for f in binary.imported_functions]
+for func in binary.imported_functions:
+print(func.name, func.address)
+for func in binary.imported_functions:
+	print(func.name, func.address)
+for imported_library in binary.imports:
+	print(imported_library.name)
+'KERNEL32.dll' in binary.imports
+current_library_names = [lib.name.tolower() for lib in binary.imports]
+dir("")
+"A".lower()
+current_library_names = [lib.name.lower() for lib in binary.imports]
+'KERNEL32.dll'.lower() in current_library_names
+binary.imports['KERNEL32.dll']
+help(dict.pop)
+hex(0xb000 + 0x3c00)
+hex(0xb000 + 0x4000)
+obj = lambda: None
+obj.list = []
+obj.str = ""
+obj
+print(obj)
+str(obj)
+obj.__dict__
+obj.__str__
+obj.__str__ = lambda: str(self.__dict__)
+str(obj)
+obj.__str__ = lambda self: str(self.__dict__)
+str(obj)
+def parse_vadinfo(fn):
+    with open(fn, 'r') as fd:
+        res = json.load(fd)
+        vads = [dict(zip(res['columns'], r)) for r in res['rows']]
+    return (vads, res)
+dlllist, _ = parse_vadinfo('~/borg-out/hello_upx/ldrmodules.0001.928.json')
+import os.path
+dlllist, _ = parse_vadinfo('/home/wmartin45/borg-out/hello_upx/ldrmodules.0001.928.json')
+import json
+dlllist, _ = parse_vadinfo('/home/wmartin45/borg-out/hello_upx/ldrmodules.0001.928.json')
+dlllist.keys()
+dlllist[0]
+for entry in dlllist:
+	print("{:016x} {}".format(entry['Base'], entry['MappedPath']))
+outbase = '/home/wmartin45/borg-out'
+vad_dir = '0001'
+dll_fn_list = [line for line in open(ps.path.join(outbase, 'hello_upx', 'dll_names.txt'), 'r').readlines()]
+dll_fn_list = [line for line in open(os.path.join(outbase, 'hello_upx', 'dll_names.txt'), 'r').readlines()]
+dll_fn_list
+dll_fn_lines = open(os.path.join(outbase, 'hello_upx', 'dll_names.txt'), 'r').readlines()
+dll_fn_names = [os.path.join(outbase, vadbase, line.strip()) for line in dll_fn_lines]
+dll_fn_names = [os.path.join(outbase, vad_dir, line.strip()) for line in dll_fn_lines]
+dll_fn_names
+lief
+tmp_dll = lief.parse(dll_fn_names[0])
+tmp_dll.exports
+dir(tmp_dll)
+tmp_dll.has_exports
+tmp_dll.exported_functions
+dll_fn_names[0]
+for entry in dlllist:
+	print("{:016x} {}".format(entry['Base'], entry['MappedPath']))
+dll_fn_names[0]
+dll_fn_names[1]
+dll_fn_names[2]
+dll_fn_names[-1]
+[fn for fn in dll_fn_names if 'dll_fn_names' in fn]
+[fn for fn in dll_fn_names if '7ea39b30' in fn]
+dll_fn_name = [fn for fn in dll_fn_names if '7ea39b30' in fn]
+dll_fn_name[0]
+dlllist[0]
+def find_dll_in_list(fn, _dlls):
+	for entry in _dlls:
+		addr = "{:016x}".format(entry['Base'])
+		if addr in fn:
+			print(entry['MappedPath'], fn)
+			break
+for fn in dll_fn_name:
+	find_dll_in_list(fn, dlllist)
+tmp_dll = lief.parse('/home/wmartin45/borg-out/0001/hello_upx.exe.7ea39b30.0x0000000074b60000-0x0000000074c6ffff.dmp')
+tmp_dll.export_functions
+tmp_dll.exported_functions
+lief.parse('/home/wmartin45/borg-out/0001/hello_upx.exe.7ea39b30.0x0000000076cc0000-0x0000000076e68fff.dmp').exported_functions
+get_exports = lambda f: lief.parse(f).exported_functions
+get_exports('/home/wmartin45/borg-out/0001/hello_upx.exe.7ea39b30.0x00000000740f0000-0x00000000740f7fff.dmp')
+def find_dll_in_list(fn, _dlls):
+	for entry in _dlls:
+		addr = "{:016x}".format(entry['Base'])
+		if addr in fn:
+			return (fn, entry)
+[find_dll_in_list(fn, dlllist) for fn in dll_fn_name]
+dll_dict = dict([find_dll_in_list(fn, dlllist) for fn in dll_fn_name])
+[get_exports(fn) for fn in dll_dict.keys()]
+for e in dll_dict.values():
+	print(e['MappedPath'])
+[k for k,v in dll_dict.items() if 'ucrtbase' in v['MappedPath']]
+dll_dict.keys()[0]
+dll_dict.viewkeys()[0]
+dir(dll_dict)
+list(dll_dict.keys())[0]
+k = list(dll_dict.keys())[0]
+dll_dict[k]
+[v['MappedPath'] for k,v in dll_dict.items() if 'ucrtbase' in v['MappedPath']] 
+import readline
+readline.write_history_file('/home/wmartin45/dll_stuff.py')
+from vmcloak.agent import Agent
+dlllist[0]
+os.path.basename('\\Windows\\System32\\wow64cpu.dll')
+help(os.path.basename)
+help(os.path)
+import os.ntpath
+import ntpath
+ntpath.basename('\\Windows\\System32\\wow64cpu.dll')
+ntpath.join('c:/users/customer/music', 'dllexp.exe')
+ntpath.normpath('c:/users/customer/music')
+ntpath.join(ntpath.normpath('c:/users/customer/music'), 'dllexp.exe')
+fd = open(os.path.join(outbase, 'hello_upx', 'dll_names.txt'), 'rb')
+some_data = fd.read()
+from io import StringIO
+log_fd = StringIO(some_data)
+defaultdict
+from collections import defaultdict
+fi = defaultdict(lambda: list)
+fi['foo']
+fi = defaultdict(lambda: list())
+fi['foo']
+fi['foo'].append(1)
+fi['foo']
+fi['bar']
+fi['bar'].append(2)
+fi
+dlllist[0]
+ntpath.basename('\\Windows\\System32\\wow64cpu.dll')
+ntpath.splitext('wow64cpu.dll')
+s = set([1,2,4,3,6,7])
+sort(s)
+sorted(s)
+type(sorted(s))
+from exceptions import RuntimeError
+from builtins import RuntimeError
+fat_pe1 = lief.parse('hello_upx_fat_imports.exe')
+fat_pe2 = lief.parse('hello_upx_fat_imports2.exe')
+dir(fat_pe1)
+lief.PE
+help(lief.PE)
+lief.PE.DATA_DIRECTORY.IAT
+fat_pe1.data_directory(lief.PE.DATA_DIRECTORY.IAT)
+type(fat_pe1)
+fat_pe1 = lief.parse('hello_upx_fat_imports.exe')
+type(fat_pe1)
+del fat_pe1
+type(fat_pe2)
+del fat_pe2
+os.path.exists
+os.path.exists('hello_upx_fat_imports.exe')
+hello_base = '/home/wmartin45/borg-out/hello_upx'
+os.path.exists(hello_base + '/hello_upx_fat_imports.exe')
+fat_pe1 = lief.parse(hello_base + '/hello_upx_fat_imports.exe')
+fat_pe1.data_directory(lief.PE.DATA_DIRECTORY.IAT)
+fat_pe1.data_directory(lief.PE.DATA_DIRECTORY.IAT).rva
+fat_pe1.data_directory(lief.PE.DATA_DIRECTORY.IAT).section
+fat_pe1.data_directory(lief.PE.DATA_DIRECTORY.IAT).size
+fat_pe1.data_directory(lief.PE.DATA_DIRECTORY.IAT).rva = 0
+fat_pe1.data_directory(lief.PE.DATA_DIRECTORY.IAT).size = 0
+dir(fat_pe1)
+fat_pe1.write(hello_base + '/hello_upx_fat_imports_no_iat.exe')
+fat_pe1 = lief.parse(hello_base + '/hello_upx_fat_imports2.exe')
+fat_pe1.data_directory(lief.PE.DATA_DIRECTORY.IAT).rva = 0
+fat_pe1.data_directory(lief.PE.DATA_DIRECTORY.IAT).size = 0
+fat_pe1.write(hello_base + '/hello_upx_fat_imports2_no_iat.exe')
+sys
+import sys
+sys.path.insert(0, '/home/wmartin45/src/vmi-unpack')
+import fix_binary
+pe_fn = hello_base + '/unpacked_hello_upx_fattened.exe'
+binary = lief.parse(pe_fn)
+cur_imports = fix_binary.get_current_imports(binary)
+jsonfuncs_fn = hello_base + '/exports.0001.928.json'
+new_imports = fix_binary.get_dll_exports_from_json(jsonfuncs_fn)
+imports_to_add = get_imports_to_add(cur_imports, new_imports)
+imports_to_add = fix_binary.get_imports_to_add(cur_imports, new_imports)
+fix_binary.add_new_imports(binary, imports_to_add)
+builder = fix_binary.build_imports(binary)
+pe_fn
+new_pe_fn = pe_fn
+fix_binary.save_build(builder, new_pe_fn)
+new_imports
+new_imports.keys()
+new_imports.pop('wow64.dll')
+imports_to_add = fix_binary.get_imports_to_add(cur_imports, new_imports)
+binary = lief.parse(pe_fn)
+fix_binary.add_new_imports(binary, imports_to_add)
+builder = fix_binary.build_imports(binary)
+fix_binary.save_build(builder, new_pe_fn)
+new_imports.pop('ntdll.dll')
+imports_to_add = fix_binary.get_imports_to_add(cur_imports, new_imports)
+binary = lief.parse(pe_fn)
+fix_binary.add_new_imports(binary, imports_to_add)
+builder = fix_binary.build_imports(binary)
+fix_binary.save_build(builder, new_pe_fn)
+current_imports
+cur_imports
+cur_imports.keys()
+new_imports.keys()
+imports_to_add = fix_binary.get_imports_to_add(cur_imports, new_imports)
+binary = lief.parse(pe_fn)
+fix_binary.add_new_imports(binary, imports_to_add)
+builder = fix_binary.build_imports(binary)
+fix_binary.save_build(builder, new_pe_fn)
+binary = lief.parse(pe_fn)
+binary.data_directory(lief.PE.DATA_DIRECTORY.IAT).rva
+binary.data_directory(lief.PE.DATA_DIRECTORY.IAT).rva = 0
+binary.data_directory(lief.PE.DATA_DIRECTORY.IAT).size = 0
+binary.write(pe_fn)
+cur_imports.keys()
+new_imports.keys()
+new_imports.pop('wow64cpu.dll')
+new_imports.pop('wow64win.dll')
+cur_imports.keys()
+hello_base
+hello_base = hello_base + '/'
+pe_fn = hello_base + 'hello_original.exe'
+new_pe_fn = hello_base + 'hello_original_fattened.exe'
+binary = lief.parse(pe_fn)
+cur_imports = fix_binary.get_current_imports(binary)
+help(json.load)
+master_exports = json.load(open(hello_base + "win7_master_dll_exports.json",'r'))
+new_imports
+new_imports.keys()
+new_imports['kernel32.dll']
+new_imports = {}
+for lib in cur_imports.keys():
+	pass
+for lib in cur_imports.keys():
+	new_imports[lib] = master_exports[lib]
+imports_to_add = fix_binary.get_imports_to_add(cur_imports, new_imports)
+fix_binary.add_new_imports(binary, imports_to_add)
+builder = fix_binary.build_imports(binary)
+fix_binary.save_build(builder, new_pe_fn)
+msvc_func = '?scan_is@?$ctype@D@std@@QEBAPEBDFPEBD0@Z'
+msvc_func in master_exports['msvcp140.dll']
+def parse_volatility_json(fn):
+    with open(fn, 'r') as fd:
+        res = json.load(fd)
+        vads = [dict(zip(res['columns'], r)) for r in res['rows']]
+    return (vads, res)
+ldr_fn = hello_base + ""
+ldr_fn = hello_base + "ldrmodules.0001.928.json"
+ldr_info = parse_volatility_json(ldr_fn)
+ldr_info.keys()
+ldr_info
+ldr_info[0]
+ldr_info[1]
+ldr_info = ldr_info[0]
+ldr_info.keys()
+ldr_info[0]
+for i in ldr_info:
+	print(ntpath.normpath(i['MappedPath']))
+help(ntpath.normpath)
+help(ntpath.normcase)
+	print(ntpath.normcase(i['MappedPath']))
+for i in ldr_info:
+	print(ntpath.normcase(i['MappedPath']))
+for i in ldr_info:
+	print(ntpath.normcase(i['MappedPath']))
+help(filter)
+get_bn = lambda path: ntpath.normcase(ntpath.basename(path))
+get_bn('hello_upx.exe')
+imports_to_add
+for i in imports_to_add:
+	type(i)
+sum([len(v) for k,v in imports_to_add.items()])
+len(imports_to_add)
+for i in imports_to_add:
+binary = lief.parse(hello_base + "hello_original_fattened.exe")
+binary.sections
+iter = binary.sections
+next(iter)
+iter = binary.sections
+sec = next(iter)
+sec
+sec.name
+sec = next(iter)
+sec.name
+binary.imports
+imp_iter = binary.imports
+imp = next(imp_iter)
+imp
+dir(imp)
+binary.rva_to_offset(imp.import_lookup_table_rva)
+binary.rva_to_offset(imp.import_lookup_table_rva - 0x1600)
+hex(23240)
+type(sec.contents)
+type(sec.content)
+sec.content[0]
+hex(sec.content[0])
+hex(sec.content[1])
+hex(sec.content[3])
+hex(sec.content[4])
+hex(sec.content[1])
+hex(sec.content[2])
+hex(sec.content[3])
+ctypes
+0x3e64
+import ctypes
+ctypes.c_uint(15972)
+addr = ctypes.c_uint(15972)
+dir(addr)
+addr.value
+import struct
+struct.pack('I', 15972)
+[hex(b) for b in struct.pack('I', 15972)]
+buf = bytes()
+buf[0] = sec.content[0]
+buf = bytes(sec.content[0:4]
+)
+buf
+struct.unpack('I', buf)
+binary.imagebase
+binary.optional_header.imagebase
+ib = binary.optional_header.imagebase
+struct.unpack('I', buf)[0]
+jmp = struct.unpack('I', buf)[0]
+ib + jmp
+struct.pack('I',4210276)
+[hex(b) for b in struct.pack('I',4210276)]
+buf = bytes(sec.content[4:4])
+struct.unpack('I', buf)[0]
+buf = bytes(sec.content[4:8])
+struct.unpack('I', buf)[0]
+[hex(b) for b in buf]
+addr = struct.unpack('I', buf)[0]
+addr += ib
+[hex(b) for b in struct.pack('I',addr)]
+0x1000
+0x10000
+addr = struct.unpack('I', buf)[0]
+addr < 0x10000
+addr += ib
+addr < 0x10000
+import readline
+readline.write_history_file('/home/wmartin45/fix_lief.py')
+binary.data_directory()
+binary.data_directory(lief.PE.DATA_DIRECTORY.IMPORT_TABLE)
+binary.data_directory(lief.PE.DATA_DIRECTORY.IMPORT_TABLE).rva
+orig_import_table_rva = binary.data_directory(lief.PE.DATA_DIRECTORY.IMPORT_TABLE).rva
+binary.rva_to_offset
+binary.rva_to_offset(orig_import_table_rva)
+orig_it_offset = binary.rva_to_offset(orig_import_table_rva)
+binary.section_from_offset(orig_it_offset)
+orig_it_section = binary.section_from_offset(orig_it_offset)
+orig_it_section.offset
+hex(orig_import_table_rva)
+hex(orig_it_offset)
+hex(orig_it_section.offset)
+it_reloff = orig_it_offset - orig_it_section.offset
+imp
+hex(imp.import_lookup_table_rva)
+orig_it_section.pointerto_raw_data
+hex(imp.import_lookup_table_rva - orig_it_section.pointerto_raw_data)
+binary.rva_to_offset(0x44c8)
+hex(17608)
+new_it_bytes = orig_it_section.content
+orig_binary = lief.parse(hello_base + "hello_original.exe")
+orig_import_table_rva = orig_binary.data_directory(lief.PE.DATA_DIRECTORY.IMPORT_TABLE).rva
+binary.rva_to_offset(imp.import_lookup_table_rva)
+binary.rva_to_offset(imp.import_lookup_table_rva) - orig_it_section.pointerto_raw_data
+orig_it_offset = orig_binary.rva_to_offset(orig_import_table_rva)
+hex(orig_it_offset)
+orig_it_section = binary.section_from_offset(orig_it_offset)
+orig_it_section.offset
+hex(orig_it_offset)
+hex(orig_it_section.offset)
+hex(orig_it_offset - orig_it_section.offset)
+it_reloff = orig_it_offset - orig_it_section.offset
+new_it_bytes = orig_it_section.content
+addr_buf = new_it_bytes[(0 + it_reloff):(0 + it_reloff + 4)]
+addr_buf
+[hex(b) for b in addr_buf]
+addr_buf = new_it_bytes[(0):(0 + 4)]
+[hex(b) for b in addr_buf]
+old_it = orig_binary.section_from_offset(orig_it_offset)
+old_it_bytes = old_it.content
+old_addr_buf = old_it_bytes[0:4]
+[hex(b) for b in old_addr_buf]
+hex(orig_it_offset)
+orig_it_section.pointerto_raw_data
+hex(orig_it_section.pointerto_raw_data)
+[hex(b) for b in addr_buf]
+0x1200 + 0x51c
+hex(0x1200 + 0x51c)
+hex(0x1600 + 0x6bc)
+addr_buf = new_it_bytes[(0 + it_reloff):(0 + it_reloff + 4)]
+hex(it_reloff)
+[hex(b) for b in addr_buf]
+hex(0x1200 + 0x51c + 0xb0)
+0xb0
+hex(orig_it_section.offset)
+hex(orig_import_table_rva)
+hex(orig_binary.rva_to_offset(orig_import_table_rva))
+hex(0x1cbc - 0x1600)
+hex(orig_import_table_rva)
+hex(imp.import_lookup_table_rva)
+orig_imp = next(orig_binary.imports)
+orig_imp
+orig_imp.import_lookup_table_rva
+hex(orig_imp.import_lookup_table_rva)
+hex(orig_imp.import_address_table_rva)
+readline.write_history_file('/home/wmartin45/fix_lief.py')
+"{}".format(orig_import_table_rva)
+"{:x}".format(orig_import_table_rva)
+"0x{:x}".format(orig_import_table_rva)
+dir(imp)
+imp_ent = next(imp.entries)
+dir(imp_ent)
+imp_ent.name
+imp.name
+hex(imp_ent.iat_address)
+hex(imp_ent.iat_value)
+dir(binary)
+binary.optional_header
+binary.optional_header.magic
+lief.PE.PE_TYPE.PE32
+binary
+binary.data_directory(lief.PE.DATA_DIRECTORY.IMPORT_TABLE)
+it = binary.data_directory(lief.PE.DATA_DIRECTORY.IMPORT_TABLE)
+dir(it)
+hex(0x400 + 0x636)
+hex(8925296)
+hex(1959057936)
+fix_binary
+fix_binary.parse_volatility_json
+def parse_volatility_json(fn):
+    with open(fn, 'r') as fd:
+        res = json.load(fd)
+        vads = [dict(zip(res['columns'], r)) for r in res['rows']]
+    return (vads, res)
+hello_base
+hello2_base = '/home/wmartin45/borg-out/hello_upx2/'
+impscan_fn = hello2_base + 'impscan.section0000.0001.2464.json'
+orig_bin = lief.parse(hello_base + 'hello_original.exe')
+unpacked_bin = lief.parse(hello_base + 'unpacked_hello_upx.exe')
+for imp in orig_bin.imports:
+	print(imp.name, hex(imp.import_address_table_rva))
+for imp in unpacked_bin.imports:
+	print(imp.name, hex(imp.import_address_table_rva))
+for imp in orig_bin.imports:
+	for entry in imp.entries:
+		print(entry.name, hex(entry.iat_address))
+for imp in orig_bin.imports:
+	entry = next(imp.entries)
+	print(entry.name, hex(entry.iat_address))
+	entry = next(imp.entries)
+	print(entry.name, hex(entry.iat_address))
+for imp in orig_bin.imports:
+	iter = imp.entries
+	entry = next(iter)
+	print(entry.name, hex(entry.iat_address))
+	entry = next(iter)
+	print(entry.name, hex(entry.iat_address))
+def imp_summary(_bin):
+	for imp in _bin.imports:
+		iter = imp.entries
+		try:
+			entry = next(iter)
+			print(imp.name, entry.name, hex(entry.iat_address))
+			entry = next(iter)
+			print(imp.name, entry.name, hex(entry.iat_address))
+		except StopIteration:
+			continue
+imp_summary(orig_bin)
+imp_summary(unpacked_bin)
+parse_volatility_json(impscan_fn)
+impscan_list, _ = parse_volatility_json(impscan_fn)
+impscan_list[0]
+print_impscan_entry = lambda e: print(e['Module'], e['Function'], e['IAT'])
+print_impscan_entry(impscan_list[0])
+print_impscan_entry = lambda e: print(e['Module'], e['Function'], hex(e['IAT']))
+print_impscan_entry(impscan_list[0])
+print_impscan_entry = lambda e, ib: print(e['Module'], e['Function'], hex(e['IAT'] - ib))
+print_impscan_entry(impscan_list[0], 0x880000)
+for e in impscan_list:
+	print_impscan_entry(e, 0x880000)
+orig_bin.libraries
+defaultdict
+impscan_dict = defaultdict(list)
+hex(0x883070 & 0xffff)
+fix_binary.get_virtual_memory_size(orig_bin)
+fix_binary.get_virtual_memory_size(unpacked_bin)
+orig_bin.virtual_size
+dir_iat = orig_bin.data_directory(lief.PE.DATA_DIRECTORY.IAT)
+dir_iat.rva
+dir_iat.size
+dir_iat.has_section
+dir_iat.section
+dir_iat.has_section = False
+dir_iat.rva = 0
+dir_iat.size = 0
+dir_iat.has_section
+dir_iat.section
+new_orig_bin = lief.parse(orig_bin.overlay)
+new_dir_iat = new_orig_bin.data_directory(lief.PE.DATA_DIRECTORY.IAT)
+new_orig_bin
+type(orig_bin.overlay)
+len(orig_bin.overlay)
+new_build = lief.PE.Builder(orig_bin).build_imports(False).patch_imports(False)
+new_build.build()
+len(new_build.get_build())
+new_orig_bin = lief.parse(new_build.get_build())
+new_dir_iat = new_orig_bin.data_directory(lief.PE.DATA_DIRECTORY.IAT)
+new_dir_iat.rva
+new_dir_iat.has_section
+new_dir_iat.section
+orig_bin.sections
+len(orig_bin.sections)
+orig_bin.sections[0]
+orig_bin.sections[1]
+unpacked_bin
+unpacked_bin.relocations
+unpacked_bin.relocations[0]
+dir(unpacked_bin.relocations[0])
+unpacked_bin.relocations[0].virtual_address
+hex(unpacked_bin.relocations[0].virtual_address)
+for entry in unpacked_bin.relocations:
+	print(entry)
+for entry in orig_bin.relocations:
+	print(entry)
+unpacked_bin = lief.parse(hello_base + 'unpacked_hello_upx.exe')
+hello2_base
+fixed_bin = lief.parse(hello2_base + 'hello_upx_fixed.exe')
+len(unpacked_bin.relocations)
+len(fixed_bin.relocations)
+import distorm3
+fix_bin_bytes = list(open(hello2_base + 'hello_upx_fixed.exe', 'rb').read())
+op_iter = distorm3.DecomposeGenerator(0x400000, fix_bin_bytes[0x1000:0x7000], distorm3.Decode32Bits)
+type(op_iter)
+op = next(op_iter)
+type(op)
+op = next(op_iter)
+op_iter = distorm3.DecomposeGenerator(0x400000, fix_bin_bytes[0x1000:0x7000], distorm3.Decode32Bits)
+my_ops = list(op_iter)
+len(my_ops)
+my_ops = list(distorm3.DecomposeGenerator(0x400000, fix_bin_bytes[0x1000:0x7000], distorm3.Decode32Bits))
+type(my_ops)
+my_ops = distorm3.DecomposeGenerator(0x400000, fix_bin_bytes[0x1000:0x7000], distorm3.Decode32Bits)
+my_ops = [op for op in my_ops]
+type(my_ops)
+my_ops = distorm3.DecomposeGenerator(0x400000, fix_bin_bytes[0x1000:0x7000], distorm3.Decode32Bits)
+my_ops_list = [op for op in my_ops]
+type(my_ops_list)
+[op for op in distorm3.DecomposeGenerator(0x400000, fix_bin_bytes[0x1000:0x7000], distorm3.Decode32Bits)]
+my_ops = [op for op in distorm3.DecomposeGenerator(0x400000, fix_bin_bytes[0x1000:0x7000], distorm3.Decode32Bits)]
+my_ops = None
+type(my_ops)
+my_ops = [op for op in distorm3.DecomposeGenerator(0x400000, fix_bin_bytes[0x1000:0x7000], distorm3.Decode32Bits)]
+type(my_ops)
+a = (my_ops = [op for op in distorm3.DecomposeGenerator(0x400000, fix_bin_bytes[0x1000:0x7000], distorm3.Decode32Bits)])
+a = my_ops = [op for op in distorm3.DecomposeGenerator(0x400000, fix_bin_bytes[0x1000:0x7000], distorm3.Decode32Bits)]
+a
+def get_ops(base, _bytes):
+	mode = distorm3.Decode32Bits
+	ops = []
+	for op in distorm3.DecomposeGenerator(base, _bytes, mode):
+		ops.append(op)
+	return ops
+my_ops = get_ops(0x400000, fix_bin_bytes[0x1000:0x7000])
+type(my_ops)
+help(distorm3)
+text_section = bytes(fix_bin_bytes[0x1000:0x7000])
+distorm3.Decompose(0x401000, text_section, distorm3.Decode32Bits)
+my_ops = distorm3.Decompose(0x401000, text_section, distorm3.Decode32Bits)
+my_ops[0]
+def _call_or_unc_jmp(op):
+    """Determine if an instruction is a call or an
+    unconditional jump
+    @param op: a distorm3 Op object
+    """
+    return ((op.flowControl == 'FC_CALL' and
+            op.mnemonic == "CALL") or
+            (op.flowControl == 'FC_UNC_BRANCH' and
+            op.mnemonic == "JMP"))
+my_ops[0].valid
+_call_or_unc_jmp(my_ops[0])
+my_calls = filter(_call_or_unc_jmp, my_ops)
+len(my_ops)
+len(my_calls)
+my_calls = list(my_calls)
+len(my_calls)
+my_calls[0].operands
+my_calls[0].operands[0]
+my_calls[0].operands[0].type
+_is_absolute_call = lambda op: op.operands[0].type == 'AbsoluteMemoryAddress'
+my_calls = list(filter(_is_absolute_call, my_calls))
+len(my_calls)
+my_calls[0]
+my_calls[0].address
+hex(my_calls[0].address)
+[op for op in mycalls if op.address == 0x401636]
+[op for op in my_calls if op.address == 0x401636]
+op = [op for op in my_calls if op.address == 0x401636][0]
+str(op)
+op.size
+dir(op.operands[0])
+op.operands[0].base
+op.operands[0].disp
+hex(op.operands[0].disp)
+hex(op.operands[0].index)
+hex(op.operands[0].dispSize)
+0x20
+hex(op.operands[0].size)
+hex(op.operands[0].value)
+op.size - op.operands[0].size
+op.size - (op.operands[0].size / 8)
+int(op.size - (op.operands[0].size / 8))
+hex(op.address + 2)
+abs_addr = 0x401638
+hex(abs_addr - 0x400000)
+hex(abs_addr - 0x400000 - 0x1000)
+len(orig_bin.relocations)
+print(orig_bin.relocations)
+for rel in orig_bin.relocations:
+	print(str(rel))
+my_ops = distorm3.Decompose(0x0, text_section, distorm3.Decode32Bits)
+my_calls = list(filter(_is_absolute_call, filter(_call_or_unc_jmp, my_ops)))
+len(my_calls)
+[for i, op in enumerate(my_calls) if op.address == 0x636]
+[(i, op) for i, op in enumerate(my_calls) if op.address == 0x636]
+my_calls[17]
+my_calls[17].address
+hex(my_calls[17].address)
+get_reloc = lambda op: op.address + (op.size - int(op.operands[0].size / 8))
+hex(get_reloc(my_calls[17]))
+reloc = get_reloc(my_calls[17])
+"{:x}".format(reloc)
+"0x{:x}".format(reloc)
+f"{reloc:x}"
+for reloc in map(get_reloc, my_calls):
+	print(f"{reloc:x}")
+op
+len(op)
+_, _, _, _ = op
+my_ops[4]
+str(my_ops[4])
+my_ops[4].disp
+dir(my_ops[4])
+my_ops[4].dt
+help(my_ops[4])
+my_ops[4].flags
+my_ops[4].operands
+my_ops[4].operands[0].type
+my_ops[4].operands[1].type
+my_ops[4].size
+my_ops[4].operands[0].size
+my_ops[4].operands[1].size
+dir(my_ops[4].operands[1])
+my_ops[4].operands[1].base
+my_ops[4].operands[1].disp
+my_ops[4].operands[1].dispSize
+my_ops[4].operands[1].index
+my_ops[4].operands[1].segment
+my_ops[4].operands[0].segment
+hex(71)
+hex(my_ops[4].address)
+op = my_ops[4]
+op
+op.opcode
+hex(op.opcode)
+help(op.operands[0])
+help(op.operands[1])
+op.codeOffset
+op.offset
+dir(op)
+op.instructionBytes
+dir(op.operands)
+dir(op.operands[0])
+op.operands[0].name
+op.operands[1].name
+op.operands[1].disp
+op.operands[1].size
+op.operands[1].size / 8
+op.size
+op.address
+hex(op.address + 1)
+op.operands[1].type
+op.operands[0].type
+def get_relocs(_bytes):
+    relocs = []
+    for op in distorm3.Decompose(0x0, _bytes, distorm3.Decode32Bits)
+        if not op.valid:
+            continue
+        for operand in op.operands:
+            if operand.type == 'AbsoluteMemoryAddress':
+                addr_size = int(operand.size / 8)
+                offset = op.size - addr_size
+                rva = op.address + offset
+                relocs.append(rva)
+                break
+def get_relocs(_bytes):
+    relocs = []
+    for op in distorm3.Decompose(0x0, _bytes, distorm3.Decode32Bits):
+        if not op.valid:
+            continue
+        for operand in op.operands:
+            if operand.type == 'AbsoluteMemoryAddress':
+                addr_size = int(operand.size / 8)
+                offset = op.size - addr_size
+                rva = op.address + offset
+                print(f"{rva:x}")
+                relocs.append(rva)
+                break
+type(text_section)
+my_relocs = get_relocs(text_section)
+for reloc in orig_bin.relocations:
+	print(reloc)
+str(my_ops[25])
+my_ops[25].operands[0].type
+my_ops[25].operands[1].type
+my_ops[25].operands[1].value
+hex(8925560)
+my_ops[4].operands[0].type
+my_ops[4].operands[1].type
+hex(my_ops[4].operands[1].disp)
+orig_bin.rva_to_section(0x4004)
+orig_bin.section_from_rva(0x4004)
+def find_section_from_ptr(addr, _binary):
+    base = _binary.optional_header.imagebase
+    if addr < base:
+        return None
+    rva = addr -  base
+    return _binary.section_from_rva(rva)
+def get_addr_in_operand(operand):
+    if operand.type == 'AbsoluteMemoryAddress':
+        return operand.disp
+    if operand.type == 'Immediate':
+        return operand.value
+    return None
+def get_relocs(_bytes, _binary):
+    relocs = []
+    for op in distorm3.Decompose(0x0, _bytes, distorm3.Decode32Bits):
+        if not op.valid:
+            continue
+        for operand in op.operands:
+            addr = get_addr_in_operand(operand)
+            if (addr is not None and
+                find_section_from_ptr(addr, _binary) is not None):
+                addr_size = int(operand.size / 8)
+                offset = op.size - addr_size
+                rva = op.address + offset
+                print(f"{rva:x}")
+                relocs.append(rva)
+                break
+    return relocs
+relocs = get_relocs(text_section, fix_bin)
+relocs = get_relocs(text_section, fixed_bin)
+def find_section_from_ptr(addr, _binary):
+    base = _binary.optional_header.imagebase
+    if addr < base:
+        return None
+    rva = addr -  base
+    try:
+        return _binary.section_from_rva(rva)
+    except lief.not_found:
+        return None
+relocs = get_relocs(text_section, fixed_bin)
+orig_bin.relocations[0].entries[0]
+dir(orig_bin.relocations[0].entries[0])
+orig_bin.relocations[0].entries[0].address
+hex(orig_bin.relocations[0].entries[0].address)
+hex(orig_bin.relocations[0].entries[0].position)
+hex(orig_bin.relocations[0].entries[0].size)
+for e in orig_bin.relocations[0].entries[0:10]:
+	print(f"{e.position:x}")
+for e in list(orig_bin.relocations[0].entries)[0:10]:
+	print(f"{e.position:x}")
+for e in list(orig_bin.relocations[0].entries)[0:20]:
+	print(f"{e.position:x}")
+relocs[0]
+for r in relocs[0:20]
+for r in relocs[0:20]:
+	print(f"{r:x}")
+reloc_set = set(relocs)
+orig_reloc_set = set([e.position for e in orig_bin.relocations[0].entries])
+help(reloc_set)
+not_in_mine = reloc_set.difference(orig_reloc_set)
+not_in_theirs = orig_reloc_set.difference(reloc_set)
+len(not_in_mine)
+len(not_in_theirs)
+len(relocs)
+len(orig_reloc_set)
+for r in not_in_mine:
+	print(f"{r:x}")
+for r in sorted(not_in_mine):
+	print(f"{r:x}")
+for r in sorted(not_in_theirs):
+	print(f"{r:x}")
+[op for op in my_ops if op.address = 0x523]
+[op for op in my_ops if op.address == 0x523]
+[op for op in my_ops if op.address == 0x523][0]
+bad_op = [op for op in my_ops if op.address == 0x523][0]
+str(bad_op)
+bad_op.operands[0].type
+bad_op.operands[0].size
+bad_op.size
+bad_op.operands[1].size
+bad_op.operands[1].type
+bad_op.opcode
+hex(bad_op.opcode)
+dir(bad_op)
+[hex(b) for b in bad_op.instructionBytes]
+def get_relocs(_bytes, _binary):
+    relocs = []
+    for op in distorm3.Decompose(0x0, _bytes, distorm3.Decode32Bits):
+        if not op.valid:
+            continue
+        operand_sizes = {}
+        total = 0
+        for i, operand in enumerate(op.operands):
+            if (operand.type == 'AbsoluteMemoryAddress' or
+                    operand.type == 'Immediate'):
+                operand_sizes[i] = int(operand.size / 8)
+                total += operand_sizes[i]
+        opcode_size = op.size - total
+        for i, operand in enumerate(op.operands):
+            addr = get_addr_in_operand(operand)
+            if (addr is not None and
+                find_section_from_ptr(addr, _binary) is not None):
+                addr_size = int(operand.size / 8)
+                offset = opcode_size + operand_sizes.get(i-1, 0)
+                rva = op.address + offset
+                print(f"{rva:x}")
+                relocs.append(rva)
+    return relocs
+relocs = get_relocs(text_section, fixed_bin)
+reloc_set = set(relocs)
+not_in_mine = reloc_set.difference(orig_reloc_set)
+not_in_theirs = orig_reloc_set.difference(reloc_set)
+len(not_in_mine)
+len(not_in_theirs)
+[hex(e) for e in not_in_mine]
+[hex(e) for e in sorted(not_in_mine)]
+[hex(e) for e in sorted(not_in_theirs)]
+bad_op = [op for op in my_ops if op.address == 0x695][0]
+bad_op.size
+bad_op.operands[0].type
+bad_op.operands[1].type
+bad_op.operands[0].size
+bad_op.operands[0].disp
+hex(bad_op.operands[0].disp)
+bad_op.operands[0].dispSize
+def get_relocs(_bytes, _binary):
+    relocs = []
+    for op in distorm3.Decompose(0x0, _bytes, distorm3.Decode32Bits):
+        if not op.valid:
+            continue
+        operand_sizes = {}
+        total = 0
+        for i, operand in enumerate(op.operands):
+            addr_size = 0
+            if operand.type == 'AbsoluteMemoryAddress':
+                addr_size = int(operand.dispSize / 8)
+            if operand.type == 'Immediate':
+                addr_size = int(operand.size / 8)
+            if addr_size:
+                operand_sizes[i] = addr_size
+                total += addr_size
+        opcode_size = op.size - total
+        for i, operand in enumerate(op.operands):
+            addr = get_addr_in_operand(operand)
+            if (addr is not None and
+                find_section_from_ptr(addr, _binary) is not None):
+                addr_size = int(operand.size / 8)
+                offset = opcode_size + operand_sizes.get(i-1, 0)
+                rva = op.address + offset
+                print(f"{rva:x}")
+                relocs.append(rva)
+    return relocs
+relocs = get_relocs(text_section, fixed_bin)
+reloc_set = set(relocs)
+not_in_mine = reloc_set.difference(orig_reloc_set)
+not_in_theirs = orig_reloc_set.difference(reloc_set)
+len(not_in_mine)
+len(not_in_theirs)
+[hex(e) for e in sorted(not_in_mine)]
+[hex(e) for e in sorted(not_in_theirs)]
+bad_op = [op for op in my_ops if op.address == 0x71c][0]
+bad_op.size
+bad_op.operands[0].type
+bad_op.operands[1].type
+bad_op.operands[0].disp
+bad_op.operands[0].dispSize
+hex(bad_op.operands[0].disp)
+def get_addr_in_operand(operand):
+    if (operand.type == 'AbsoluteMemoryAddress' or
+            operand.type == 'AbsoluteMemory'):
+        return operand.disp
+    if operand.type == 'Immediate':
+        return operand.value
+    return None
+def get_relocs(_bytes, _binary):
+    relocs = []
+    for op in distorm3.Decompose(0x0, _bytes, distorm3.Decode32Bits):
+        if not op.valid:
+            continue
+        operand_sizes = {}
+        total = 0
+        for i, operand in enumerate(op.operands):
+            addr_size = 0
+            if (operand.type == 'AbsoluteMemoryAddress' or
+                    operand.type == 'AbsoluteMemory'):
+                addr_size = int(operand.dispSize / 8)
+            if operand.type == 'Immediate':
+                addr_size = int(operand.size / 8)
+            if addr_size:
+                operand_sizes[i] = addr_size
+                total += addr_size
+        opcode_size = op.size - total
+        for i, operand in enumerate(op.operands):
+            addr = get_addr_in_operand(operand)
+            if (addr is not None and
+                find_section_from_ptr(addr, _binary) is not None):
+                addr_size = int(operand.size / 8)
+                offset = opcode_size + operand_sizes.get(i-1, 0)
+                rva = op.address + offset
+                print(f"{rva:x}")
+                relocs.append(rva)
+    return relocs
+relocs = get_relocs(text_section, fixed_bin)
+reloc_set = set(relocs)
+not_in_mine = reloc_set.difference(orig_reloc_set)
+not_in_theirs = orig_reloc_set.difference(reloc_set)
+len(not_in_mine)
+len(not_in_theirs)
+[hex(e) for e in sorted(not_in_mine)]
+[hex(e) for e in sorted(not_in_theirs)]
+bad_op = [op for op in my_ops if op.address == 0x89d][0]
+bad_op.size
+bad_op.operands[0].type
+bad_op.operands[0].dispSize
+len(bad_op.operands)
+bad_op.operands[1].size
+bad_op.operands[1].dispSize
+str(bad_op)
+bad_op.operands[1].type
+def find_section_from_ptr(addr, _binary):
+    base = _binary.optional_header.imagebase
+    if addr < base:
+        return None
+    if addr == base:
+        return addr
+    rva = addr -  base
+    try:
+        _binary.section_from_rva(rva)
+        return addr
+    except lief.not_found:
+        return None
+relocs = get_relocs(text_section, fixed_bin)
+reloc_set = set(relocs)
+not_in_mine = reloc_set.difference(orig_reloc_set)
+not_in_theirs = orig_reloc_set.difference(reloc_set)
+len(not_in_mine)
+len(not_in_theirs)
+[hex(e) for e in sorted(not_in_mine)]
+[hex(e) for e in sorted(not_in_theirs)]
+bad_op = [op for op in my_ops if op.address == 0x8a6][0]
+str(bad_op)
+def find_section_from_ptr(addr, _binary):
+    base = _binary.optional_header.imagebase
+    if addr < base:
+        return None
+    lowest_vaddr = min([sec.virtual_address for sec in _binary.sections])
+    if addr >= base and addr < base + lowest_vaddr:
+        return addr
+    rva = addr - base
+    try:
+        _binary.section_from_rva(rva)
+        return addr
+    except lief.not_found:
+        return None
+relocs = get_relocs(text_section, fixed_bin)
+reloc_set = set(relocs)
+not_in_mine = reloc_set.difference(orig_reloc_set)
+not_in_theirs = orig_reloc_set.difference(reloc_set)
+len(not_in_mine)
+len(not_in_theirs)
+[hex(e) for e in sorted(not_in_mine)]
+[hex(e) for e in sorted(not_in_theirs)]
+struct.pack("I", 12345)
+struct.pack("I", 3421)
+_b = struct.pack("I", 3421)
+str(_b)
+str(list(map(hex, _b)))
+fixed_bin = lief.parse(hello2_base + 'hello_upx_fixed.exe')
+for lib in fixed_bin.imports:
+	print(lib, f"{lib.import_address_table_rva:x}")
+for lib in fixed_bin.imports:
+	print(lib)
+for lib in unpacked_bin.imports:
+	print(lib)
+for lib in unpacked_bin.imports:
+	print(lib.name, hex(lib.import_address_table_rva))
+for lib in fixed_bin.imports:
+	print(lib.name, hex(lib.import_address_table_rva))
+for lib in fixed_bin.imports:
+	print(lib.name, hex(lib.import_address_table_rva))
+fixed_bin = lief.parse(hello2_base + 'hello_upx_fixed.exe')
+for lib in fixed_bin.imports:
+	print(lib.name, hex(lib.import_address_table_rva))
+lib = fixed_bin.imports[0]
+dir(lib)
+str(lib)
+lib = fixed_bin.imports[5]
+str(lib)
+dir(lib)
+lib.get_function_rva_from_iat('SetUnhandledExceptionFilter')
+lib.iat_directory
+lib.directory
+fixed_bin.data_directory
+fixed_bin.data_directory(lief.PE.DATA_DIRECTORY.IMPORT_TABLE)
+_it = fixed_bin.data_directory(lief.PE.DATA_DIRECTORY.IMPORT_TABLE)
+_it.rva
+hex(_it.rva)
+sec = fixed_bin.section_from_rva(_it.rva)
+sec
+sec.content[0:64]
+list(map(hex, sec.content[0:64]))
+list(map(hex, sec.content[0xdc:0xdc + 64]))
+hex(lib.import_lookup_table_rva)
+hex(lib.import_address_table_rva)
+sec_bytes = bytes(sec.content)
+sec_bytes.find([0xd0, 0xb1, 0x0, 0x0])
+sec_bytes.find(bytes([0xd0, 0xb1, 0x0, 0x0]))
+hex(116)
+lookup_rva, _, _, name_rva, iat_rva = struct.unpack("IIIII", bytes(sec_bytes[0:20]))
+hex(lookup_rva)
+hex(iat_rva)
+hex(name_rva)
+struct.unpack("s", bytes(sec_bytes[name_rva:name_rva+32]))
+struct.unpack("s", name_rva)
+struct.unpack("s", bytes(name_rva))
+bytes(name_rva)
+type(name_rva)
+name_rva
+hex(name_rva)
+struct.unpack("s", byte(name_rva))
+help(bytes)
+struct.unpack("s", bytes([name_rva]))
+i = name_rva
+name_bytes = []
+name_bytes.append(sec_bytes[i])
+i
+hex(name_rva)
+sec.virtual_address
+hex(sec.virtual_address)
+sec_base = sec.virtual_address
+i = name_rva - sec_base
+lib_name = ""
+c = sec_bytes[i]
+while c != 0x0:
+    lib_name += chr(c)
+    i += 1
+    c = sec_bytes[i]
+lib_name
+hex(_it.rva)
+(a,b) = (1,2)
+a
+b
+def find_import_descriptor(lib_name, _bin):
+    import_dir = _bin.data_directory(lief.PE.DATA_DIRECTORY.IMPORT_TABLE)
+    sec = _bin.section_from_rva(import_dir.rva)
+    sec_base = sec.virtual_address
+    sec_bytes = bytes(sec.content)
+    found_offset = None
+    offset = import_dir.rva - sec_base
+    descriptor_bytes = bytes(sec_bytes[offset:offset+20])
+    lookup_rva, _, _, name_rva, iat_rva = struct.unpack("IIIII", descriptor_bytes)
+    while lookup_rva != 0x0:
+        name_offset = name_rva - sec_base
+        tmp_name = ""
+        b = sec_bytes[name_offset]
+        while b != 0x0:
+            tmp_name += chr(b)
+            name_offset += 1
+            b = sec_bytes[name_offset]
+        print(tmp_name, hex(offset))
+        if tmp_name.lower() == lib_name.lower():
+            found_offset = offset
+        offset += 20
+        descriptor_bytes = bytes(sec_bytes[offset:offset+20])
+        (lookup_rva, _, _, name_rva, iat_rva
+        )= struct.unpack("IIIII", descriptor_bytes)
+    if found_offset is not None:
+        print(f"found_offset=0x{found_offset:x}")
+    return found_offset
+def find_import_descriptor(lib_name, _bin):
+    import_dir = _bin.data_directory(lief.PE.DATA_DIRECTORY.IMPORT_TABLE)
+    sec = _bin.section_from_rva(import_dir.rva)
+    sec_base = sec.virtual_address
+    sec_bytes = bytes(sec.content)
+    found_offset = None
+    offset = import_dir.rva - sec_base
+    descriptor_bytes = bytes(sec_bytes[offset:offset+20])
+    lookup_rva, _, _, name_rva, iat_rva = struct.unpack("IIIII", descriptor_bytes)
+    while lookup_rva != 0x0:
+        name_offset = name_rva - sec_base
+        tmp_name = ""
+        b = sec_bytes[name_offset]
+        while b != 0x0:
+            tmp_name += chr(b)
+            name_offset += 1
+            b = sec_bytes[name_offset]
+        print(tmp_name, hex(offset))
+        if tmp_name.lower() == lib_name.lower():
+            found_offset = offset
+        offset += 20
+        descriptor_bytes = bytes(sec_bytes[offset:offset+20])
+        (lookup_rva, _, _, name_rva, iat_rva
+        )= struct.unpack("IIIII", descriptor_bytes)
+    if found_offset is not None:
+        print(f"found_offset=0x{found_offset:x}")
+    return found_offset
+fixed_bin.libraries
+find_import_descriptor('KERNEL32.DLL', fixed_bin)
+fixed_bin = lief.parse(hello2_base + 'hello_upx_fixed.exe')
+for lib in fixed_bin.imports:
+	print(lib)
+for lib in unpacked_bin.imports:
+	print(lib)
+raw_bin = lief.parse(hello2_base + '')
+raw_bin = lief.parse(hello2_base + 'hello_upx.exe.7d116b30.0x0000000000880000-0x0000000000889fff.dmp')
+raw_fn = 'hello_upx.exe.7d116b30.0x0000000000880000-0x0000000000889fff.dmp'
+raw_bin.libraries
+raw_bin.imports
+raw_bin.imports[0]
+raw_bin.data_directory
+raw_bin.data_directory(lief.PE.DATA_DIRECTORY.IMPORT_TABLE)
+raw_bin.data_directory(lief.PE.DATA_DIRECTORY.IMPORT_TABLE).rva
+hex(raw_bin.data_directory(lief.PE.DATA_DIRECTORY.IMPORT_TABLE).rva)
+hex(1065276)
+hello_bin.section_from_rva(0x1627)
+orig_bin.section_from_rva(0x1627)
+orig_bin.section_from_rva(0x123456)
+orig_bin.entrypoint
+hex(orig_bin.entrypoint)
+orig_bin.optional_header.
+help(orig_bin.optional_header)
+orig_bin.optional_header.addressof_entrypoint
+hex(orig_bin.optional_header.addressof_entrypoint)
+hex(8925404)
+hex(8925320)
+master_exports
+master_exports.keys()
+win7_dlls.keys()
+exports_fn = 'win7_master_dll_exports.json'
+with open(exports_fn, 'r') as fd:
+	win7_dlls = json.load(fd)
+l = [1,2,3]
+l[-1:]
+l.reverse()
+l
+l.reverse()
+l
+l[::-1]
+o = Object()
+o = object()
+o
+o.foo = 1
+o = lambda: None
+o.foo = 1
+31-22
+21-12
+9+9+11
+64-22
+import ctypes
+ull = ctypes.c_ulonglong(1)
+ull
+ull -= 1
+a = ctypes.c_ulonglong(0)
+a
+a = a - ull
+dir(a)
+a.value
+b = ctypes.c_ulonglong(-1)
+b
+b.value
+bin(b.value)
+vmi_bit_mask = lambda: None
+vmi_bit_mask = lambda a, b: (-1 >> (63 - b)) & ~((1 << a) - 1)
+mask1 = vmi_bit_mask(0,9)
+bin(mask1)
+int(b)
+int(b.value)
+ctypes.c_ulonglong(-1).value
+vmi_bit_mask = lambda a, b: (ctypes.c_ulonglong(-1).value >> (63 - b)) & ~((1 << a) - 1)
+mask1 = vmi_bit_mask(0,9)
+bin(mask1)
+63 - 9
+hex(ctypes.c_ulonglong(-1).value >> 54)
+1 << 0
+~0
+hex( (ctypes.c_ulonglong(-1).value >> 54) & ctypes.c_ulonglong(~0).value )
+vaddr = 0xef1627
+pgd_index = lambda v: ((v >> 22) & vmi_bit_mask(0,9)) * 32
+pgd_index(vaddr)
+cr3=0x75d1e000
+pdba_base = lambda c: c & vmi_bit_mask(12,31)
+hex(vmi_bit_mask(12,31)
+)
+bin(vmi_bit_mask(0,9))
+hex(vmi_bit_mask(0,9))
+hex(pdba_base(cr3))
+pgd_index(vaddr)
+hex(96)
+hex(pdba_base(cr3) + pgd_index(vaddr))
+pgd_index = lambda v: ((v >> 22) & vmi_bit_mask(0,9)) * 32
+hex(vaddr >> 22)
+vaddr
+hex(vaddr)
+hex(0x3 & vmi_bit_mask(0,9))
+0x3
+pte_index = lambda v: ((v >> 12) & vmi_bit_mask(0,9)) * 32)
+pte_index = lambda v: ((v >> 12) & vmi_bit_mask(0,9)) * 32
+hex(pte_index(vaddr))
+pgd_index = lambda v: ((v >> 21) & vmi_bit_mask(0,8)) * 8
+pgd_index(vaddr)
+pdba_base = lambda c: c & vmi_bit_mask(12,51)
+hex(pdba_base(cr3))
+hex(cr3)
+hex(pgd_index(vaddr))
+pgd_index(vaddr)
+56 / 8
+l4_index = 7
+hex(vaddr)
+page_offset = vaddr & vmi_bit_mask(0,11)
+hex(page_offset)
+pt_idx = (vaddr >> 12) & vmi_bit_mask(0,8)
+pd_idx (vaddr >> 21) & vmi_bit_mask(0,8)
+pd_idx = (vaddr >> 21) & vmi_bit_mask(0,8)
+pdpt_idx = (vaddr >> 30) & vmi_bit_mask(0,8)
+pml_idx = (vaddr >> 38) & vmi_bit_mask(0,8)
+addr_top = (vaddr >> 47)
+hex(page_offset)
+hex(pd_idx)
+hex(pdpt_idx)
+hex(pt_idx)
+pt_index
+pt_idx
+hex(0xabff0000 + 0x1234)
+hex(vmi_bit_mask(39, 63))
+hex(0xFFFFF40000000 << 12)
+hex(vmi_bit_mask(0, 38))
+hex(ctypes.c_ulonglong( ~ 0x7fffffffff ).value)
+bin(vmi_bit_mask(39, 63))
+bstr = '1111111111111111111111111000000000000000000000000000000000000000'
+len(bstr)
+bstr[0:38]
+63 - 39
+bstr[24:]
+bstr[25:]
+len(bstr[25:])
+len(bstr[24:])
+0x3c1000 - 0x1c1000
+hex(0x3c1000 - 0x1c1000)
+hex(0x200000 >> 12)
+hex(0x200000 >> 21)
+hex(0x3c1000 >> 12)
+hex(0x3c1000 >> 21)
+hex(0x1c1000 >> 21)
+hex(0x3c1627 >> 12)
+hex(0x3c1627 >> 21)
+hex(0x461627 >> 21)
+hex((0x461627 - 0x200000) >> 21)
+hex((0x461627 - 0x200000))
+ 
+hex(0x60000 >> 12)
+hex(0x460000 >> 12)
+vmi_bit_mask(0,8)
+hex(511)
+bin(511)
+hex((0x3c1627 >> 21) & 0x1ff)
+((0x3c1627 >> 21) & 0x1ff)
+def get_vaddr_indexes(vaddr):
+    pass
+test_vaddr = 0x77b6a8f8
+def get_vaddr_indexes(vaddr):
+	pt = (vaddr >> 12) & 0x1ff
+	pd = (vaddr >> 21) & 0x1ff
+	pdpt = (vaddr >> 30) & 0x1ff
+	pml4 = (vaddr >> 39) & 0x1ff
+	return f"pt={pt} pd={pd} pdpt={pdpt} pml4={pml4}"
+get_vaddr_indexes(test_vaddr)
+get_vaddr_indexes(0x16a000)
+get_vaddr_indexes(test_vaddr)
+get_vaddr_indexes(0x7efdd000)
+get_vaddr_indexes(0x3efdd000)
+get_vaddr_indexes(0x7efdd000)
+get_vaddr_indexes(0x1dd000)
+vmi_bit_mask = lambda a, b: (ctypes.c_ulonglong(-1).value >> (63 - b)) & ~( (ctypes.c_ulonglong(1) << a) - 1 )
+hex(vmi_bit_mask(0,11))
+1 << 3
+hex(1 << 3)
+hex(1 << 4)
+hex((1 << 4)-1)
+hex(~((1 << 4)-1))
+hex(~(ctypes.c_ulonglong((1 << 4)-1)))
+hex(~(ctypes.c_ulonglong((1 << 4)-1).value))
+hex(ctypes.c_ulonglong(-0x10).value)
+vmi_bit_mask = lambda a, b: (ctypes.c_ulonglong(-1).value >> (63 - b)) & ctypes.c_ulonglong(~((1 << a) - 1)).value
+hex(vmi_bit_mask(0,11))
+hex(0x401627 & vmi_bit_mask(0,11))
+hex(0x401627 & vmi_bit_mask(12,63))
+hex(0x407005 & vmi_bit_mask(12,63))
+'hello_mpress.exe'[:14]
+1392496
+1392496.0 /1024
+import libvirt
+from vmcloak.agent import Agent
+import xml.etree.ElementTree as ET
+LIBVIRT_CONN_SINGLETON = None
+dom = get_domain('win7-egg01')
+connect_to_libvirt()
+dom = get_domain('win7-egg01')
+dom_xml = dumpxml(dom)
+guest_ip, _ = get_network_info(dom, dom_xml)
+guest_ip
+a = Agent(guest_ip)
+a = Agent(guest_ip, 8000)
+a.ping()
+ping_loop(a)
+borg_dom = get_domain('win7-borg')
+borg_a = Agent('192.168.142.99', 8000)
+ping_loop(borg_a)
+borg_a.execute('c:/users/customer/music/hello_mpress.exe', _async=True)
+ping_loop(a)
+a.execute('c:/users/customer/music/hello_mpress.exe', _async=True)
+import readline
+import os
+os.getcwd()
+readline.write_history_file('last-tty3-session.history')
