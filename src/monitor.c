@@ -133,6 +133,41 @@ static inline int rip_in_page(addr_t rip, addr_t vaddr, page_cat_t cat)
     return addr_in_range(rip, page, size);
 }
 
+static inline int addr_in_imagebase(addr_t suspect, pid_events_t *pe)
+{
+    return addr_in_range(suspect, pe->vad_pe_start, pe->vad_pe_size);
+}
+
+#define swap_access(acc,wanted) \
+    ((wanted & VMI_MEMACCESS_W) \
+         ? ((acc & ~VMI_MEMACCESS_X) | VMI_MEMACCESS_W) \
+         : ((acc & ~VMI_MEMACCESS_W) | VMI_MEMACCESS_X) \
+    )
+
+void update_access_map(pid_events_t *pe, addr_t vaddr,
+        addr_t paddr, vmi_mem_access_t access_wanted)
+{
+    int need_insert = 0;
+    vmi_mem_access_t access = (vmi_mem_access_t)(long)
+        g_hash_table_lookup(pe->access_map, GINT_TO_POINTER(paddr));
+    if (!access)
+        log_debug("paddr=0x%lx (vaddr=0x%lx) not in access_map. adding...",
+                paddr, vaddr);
+    if ( !(access & access_wanted) )
+    {
+        access = swap_access(access, access_wanted);
+        need_insert = 1;
+    }
+    if (!(access & VMI_MEMACCESS_W2X) && addr_in_imagebase(vaddr, pe))
+    {
+        access |= VMI_MEMACCESS_W2X;
+        need_insert = 1;
+    }
+    if (need_insert)
+        g_hash_table_insert(pe->access_map,
+                GINT_TO_POINTER(paddr), GINT_TO_POINTER(access));
+}
+
 // maintain global trapped_pages hash and set memory traps
 void monitor_set_trap(vmi_instance_t vmi, addr_t paddr, vmi_mem_access_t access,
                       vmi_pid_t pid, page_cat_t cat, addr_t vaddr)
@@ -358,6 +393,7 @@ void destroy_watched_pid(gpointer data)
     pid_events_t *val = (pid_events_t *)data;
     g_hash_table_destroy(val->write_exec_map);
     g_hash_table_destroy(val->wr_traps);
+    g_hash_table_destroy(val->access_map);
     free(val->process_name);
     if (val->vadinfo_bundles) g_ptr_array_unref(val->vadinfo_bundles);
     g_slice_free(pid_events_t, val);
@@ -375,6 +411,7 @@ pid_events_t *add_new_pid(vmi_pid_t pid)
                            NULL, (GDestroyNotify)g_hash_table_destroy);
     pval->wr_traps = g_hash_table_new_full(g_direct_hash, g_direct_equal,
                                            NULL, NULL);
+    pval->access_map = g_hash_table_new(g_direct_hash, g_direct_equal);
     g_hash_table_insert(vmi_events_by_pid, GINT_TO_POINTER(pid), pval);
     pval->process_name = NULL;
     pval->vadinfo_bundles = NULL;

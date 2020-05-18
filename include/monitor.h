@@ -146,6 +146,7 @@ typedef struct
     page_table_monitor_cb_t cb;
     GHashTable *write_exec_map;
     GHashTable *wr_traps;
+    GHashTable *access_map;
     GPtrArray *vadinfo_bundles;
     int vad_pe_index;
     addr_t vad_pe_start;
