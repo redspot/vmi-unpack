@@ -493,11 +493,14 @@ def reconstruct_imports(_ldr_fn, _redir_fn, _impscan_obj):
 @click.argument('dump_count')
 @click.argument('redirects_fn')
 @click.option('-d', '--debug', is_flag=True)
-def main(pe_fn, new_pe_fn, json_dir, dump_count, redirects_fn, debug):
+@click.option('-L', '--debug-lief', 'dbglief', is_flag=True)
+def main(pe_fn, new_pe_fn, json_dir, dump_count, redirects_fn, debug, dbglief):
+    global DEBUG
     if debug:
+        DEBUG = True
+    if dbglief:
         Logger.enable()
         Logger.set_level(lief.LOGGING_LEVEL.DEBUG)
-        # DEBUG = True
     verbose_print("opening existing pe: file={}".format(pe_fn))
     with open(pe_fn, 'rb') as fd:
         pe_bytes = list(fd.read())
