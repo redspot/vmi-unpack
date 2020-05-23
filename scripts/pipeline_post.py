@@ -611,9 +611,10 @@ def get_slot_and_basename(_dump_file, _dump_dir):
     return (int(_slot), _old_name)
 
 
-def call_fix_binary(_dump_file, _dump_dir, _slot, _old_name, _outdir,
+def call_fix_binary(_dump_file, _dump_dir, _slot, _old_name, _outdir, *_args,
                     _script_name='fix_binary.py',
-                    _redirects=MASTER_REDIRECTS):
+                    _redirects=MASTER_REDIRECTS,
+                    **kwargs):
     '''
     fix_binary.py
         ~/borg-out/hello_mpress/hello_mpress.e.7dc58480.0x0000000000400000-0x0000000000408fff.dmp.0003
@@ -633,13 +634,12 @@ def call_fix_binary(_dump_file, _dump_dir, _slot, _old_name, _outdir,
         _dump_dir,
         _slot,
         _redirects,
-        ]))
+        ] + _args))
     try:
         logger.debug(f"starting {_script_name} args={args}")
-        p = subprocess.run(args, capture_output=True, check=True, text=True)
+        p = subprocess.run(args, capture_output=True, check=True, text=True,
+                           **kwargs)
         logger.debug(f"completed {_script_name} returncode={p.returncode}")
-        with open(f'{_new_path}.log', 'w') as out:
-            out.write(p.stdout)
         return True
     except subprocess.CalledProcessError as exc:
         if exc.returncode != 1337:
@@ -650,6 +650,13 @@ def call_fix_binary(_dump_file, _dump_dir, _slot, _old_name, _outdir,
             logger.debug(f"completed {_script_name}"
                          f" returncode={exc.returncode}")
         return False
+    finally:
+        with open(f'{_new_path}.log', 'w') as out:
+            out.write(p.stdout)
+        with open(f'{_new_path}.err', 'w') as out:
+            out.write(p.stderr)
+        logger.debug(f"stdout:\n{p.stdout}")
+        logger.debug(f"stderr:\n{p.stderr}")
 
 
 def call_post_dump(_dir,
@@ -699,13 +706,17 @@ def chown_workdir(_workdir):
     )
 
 
-def fix_and_save_vads(_dump_files, _workdir, _outdir):
+def fix_and_save_vads(_dump_files, _workdir, _outdir,
+                      *args, **kwargs):
     any_fixes = False
     for _file in _dump_files:
+        logger.debug(f'trying to fix {_file}')
         slot, basename = get_slot_and_basename(_file, _workdir)
         if slot is not None:
             any_fixes = call_fix_binary(_file, _workdir, slot,
-                                        basename, _outdir)
+                                        basename, _outdir,
+                                        *args, **kwargs) \
+                        or any_fixes
             out_name = f'{basename}.{int(slot):04}'
             out_path = Path(_outdir) / out_name
             shutil.copy(_file, str(out_path))
@@ -713,6 +724,8 @@ def fix_and_save_vads(_dump_files, _workdir, _outdir):
             for _json in glob(str(Path(_workdir) / '*.json')):
                 shutil.copy(_json, str(_outdir))
                 logger.debug(f"copy {_json} to {_outdir}")
+        else:
+            logger.debug(f'slot was None. not fixing')
     return any_fixes
 
 
@@ -760,7 +773,8 @@ def main(workdir, outdir, dry_run):
         logger.error("no dumpfiles produced")
         dry_run or shutil.rmtree(workdir, ignore_errors=True)
         return (rc + RC_NO_VADS), exec_runtime
-    if fix_and_save_vads(dumpfiles, workdir, outdir):
+    args = ['--debug'] if dry_run else []
+    if fix_and_save_vads(dumpfiles, workdir, outdir, *args):
         dry_run or shutil.rmtree(workdir, ignore_errors=True)
     else:
         logger.error("no EXEs created, but deleting workdir anyway")
