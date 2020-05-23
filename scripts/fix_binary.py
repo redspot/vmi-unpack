@@ -40,7 +40,10 @@ def verbose_print(msg):
 
 def parse_volatility_json(fn):
     with open(fn, 'r') as fd:
-        res = json.load(fd)
+        try:
+            res = json.load(fd)
+        except json.JSONDecodeError:
+            return None, None
         vads = [dict(zip(res['columns'], r)) for r in res['rows']]
     return (vads, res)
 
@@ -58,7 +61,14 @@ def parse_impscan_json(_dir, _count):
     suffix = f'{int(_count):04}.{_pid}.json'
     vadinfo_fn = os.path.join(_dir, f'vadinfo.{suffix}')
     _, raw_json = parse_volatility_json(vadinfo_fn)
-    _oep = raw_json['rip']
+    if raw_json is None:
+        verbose_print(f'error: cannot parse json {vadinfo_fn}')
+        sys.exit(3)
+    try:
+        _oep = raw_json['rip']
+    except KeyError:
+        verbose_print(f'rip not found in json {vadinfo_fn}')
+        sys.exit(2)
     ldrmodules_fn = os.path.join(_dir, f'ldrmodules.{suffix}')
 
     obj = lambda: None  # noqa: E731
@@ -68,8 +78,15 @@ def parse_impscan_json(_dir, _count):
 
     # combine impscan data into one list
     impscan_glob = os.path.join(_dir, f'impscan.section????.{suffix}')
-    for fn in glob(impscan_glob):
+    fns = glob(impscan_glob)
+    debug_print(f'found {len(fns)} impscan files')
+    for fn in fns:
         is_list, _ = parse_volatility_json(fn)
+        if is_list is None:
+            debug_print(f'warning: cannot parse imports in {fn}')
+            continue
+        if len(is_list):
+            debug_print(f'found {len(is_list)} functions in {fn}')
         obj.raw += is_list
 
     for entry in obj.raw:
