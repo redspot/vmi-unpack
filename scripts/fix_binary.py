@@ -1,3 +1,5 @@
+#!/home/linuxbrew/.linuxbrew/bin/python3
+import itertools
 import json
 import ntpath
 import os.path
@@ -403,15 +405,22 @@ def reconstruct_imports(_ldr_fn, _redir_fn, _impscan_obj):
     _splits = get_split_jumps(_imp_by_j)
 
     # do the magic
-    chosen_so_far = []
+    chosen_so_far = set()
     _new_imports = {}
+    candidate_sets = defaultdict(lambda: (lambda: None))
     # each jump set is one library to import
     for j, jset in enumerate(_splits):
+        set_ = candidate_sets[j]
         # count how many times each library.function combo can be used
         lib_stats = defaultdict(int)
         # keep track of each possible lib.func combo per jump
         funcs_in_jset = []
         scanned_func = []
+        # add everything to the bundle
+        set_.lib_stats = lib_stats
+        set_.funcs_in_jset = funcs_in_jset
+        set_.scanned_func = scanned_func
+        set_.jset = jset
         # each jump is one function for this library
         for jump in jset:
             lib_name = _imp_by_j[jump]['Module']
@@ -419,6 +428,8 @@ def reconstruct_imports(_ldr_fn, _redir_fn, _impscan_obj):
             func = _imp_by_j[jump]['Function']
             debug_print(f"processing scanned function {lib_bn}.{func}")
             scanned_func.append((lib_bn, func))
+            # slot_dict will contain the scanned lib.func
+            # and any alias/redirects
             slot_dict = {lib_bn: func}
             funcs_in_jset.append(slot_dict)
             lib_stats[lib_bn] += 1
@@ -429,60 +440,100 @@ def reconstruct_imports(_ldr_fn, _redir_fn, _impscan_obj):
                         path_bn = ntpath.basename(dll_path)
                         slot_dict[path_bn] = other_func
                         lib_stats[path_bn] += 1
-        # print(lib_stats)
-        # figure out which lib to use:
-        #
-        found_candidate = False
-        # strategy 1:
-        #    there are N functions,
-        #    and foo.dll is seen N times,
-        #    of all libs counts, if only one of them is seen N times
-        #    then it, foo.dll, must be the correct lib
+    # figure out which lib to use:
+    #
+    # first pass: check strategy 1
+    # second pass: check strategy 2
+    #
+    # strategy 1:
+    #    there are N functions,
+    #    and foo.dll is seen N times.
+    #    of all libs counted, if only one of them is seen N times
+    #    then it, foo.dll, must be the correct lib
+    # strategy 2:
+    #   just pick the last lib that hasn't been chosen yet
+
+    # first pass: do all the len() == 1 libs first
+    first_pass_sets = {}
+    for j in list(candidate_sets.keys()):
+        set_ = candidate_sets[j]
+        lib_stats = set_.lib_stats
+        jset = set_.jset
         candidates = [lib
                       for lib, count in lib_stats.items()
                       if count >= len(jset)]
         if len(candidates) == 1:
             chosen_lib = candidates[0]
             if chosen_lib not in chosen_so_far:
-                debug_print(f"choosing {chosen_lib}")
-                chosen_so_far.append(chosen_lib)
-                found_candidate = True
+                debug_print(f"first pass: choosing {chosen_lib}")
+                chosen_so_far.add(chosen_lib)
+                set_.chosen_lib = chosen_lib
+                first_pass_sets[j] = candidate_sets.pop(j)
             else:
                 print(f"error: strategy 1 used, "
                       f"but {chosen_lib} was already chosen")
         else:
-            # strategy 2:
-            #   just pick the last lib that hasn't been chosen yet
-            for candidate in candidates[::-1]:
-                if candidate not in chosen_so_far:
-                    chosen_lib = candidate
-                    debug_print(f"choosing {chosen_lib}")
-                    chosen_so_far.append(chosen_lib)
-                    found_candidate = True
-                    break
-        if not found_candidate:
-            print(lib_stats)
-            print(candidates)
-            raise RuntimeError("no valid candidate found")
-        else:
-            # we found it
-            _new_imports[chosen_lib] = [slot[chosen_lib]
-                                        for slot in funcs_in_jset]
-            for i, _scanned_tup in enumerate(scanned_func):
-                scanned_lib, _func = _scanned_tup
-                if scanned_lib != chosen_lib:
-                    f_rva = _impscan_obj.lookup[scanned_lib][_func]
-                    chosen_func = funcs_in_jset[i][chosen_lib]
-                    _impscan_obj.lookup[chosen_lib][chosen_func] = f_rva
-            if chosen_lib not in _impscan_obj.rva:
-                lib_jumps = _splits[j]
-                debug_print(f"lib_jumps[{j}] = "
-                            f"chosen:{chosen_lib} = "
-                            f"{lib_jumps}")
-                # mask vaddr to make it rva
-                iat_start = min(lib_jumps) & 0xFFFF
-                debug_print(f"iat_start for lib {chosen_lib} = {iat_start:x}")
-                _impscan_obj.rva[chosen_lib] = iat_start
+            debug_print(f"first pass: skipping {candidates}")
+    # second pass:
+    second_pass_sets = {}
+    for j in list(candidate_sets.keys()):
+        set_ = candidate_sets[j]
+        lib_stats = set_.lib_stats
+        jset = set_.jset
+        candidates = [lib
+                      for lib, count in lib_stats.items()
+                      if count >= len(jset)]
+        for candidate in candidates[::-1]:
+            if candidate not in chosen_so_far:
+                chosen_lib = candidate
+                debug_print(f"second pass: choosing {chosen_lib}")
+                chosen_so_far.add(chosen_lib)
+                set_.chosen_lib = chosen_lib
+                second_pass_sets[j] = candidate_sets.pop(j)
+                break
+    # error pass: all libs should be chosen by now
+    imports_remain = False
+    for set_ in candidate_sets.values():
+        lib_stats = set_.lib_stats
+        jset = set_.jset
+        funcs_in_jset = set_.funcs_in_jset
+        scanned_func = set_.scanned_func
+        candidates = [lib
+                      for lib, count in lib_stats.items()
+                      if count >= len(jset)]
+        print(f"error: no candidate library found for {candidates}")
+        print(lib_stats)
+        print(funcs_in_jset)
+        print(scanned_func)
+        imports_remain = True
+    if imports_remain:
+        raise RuntimeError("no valid candidate found")
+    for j, set_ in itertools.chain(first_pass_sets.items(),
+                                   second_pass_sets.items()):
+        funcs_in_jset = set_.funcs_in_jset
+        scanned_func = set_.scanned_func
+        chosen_lib = set_.chosen_lib
+        # we found it
+        _new_imports[chosen_lib] = [slot[chosen_lib]
+                                    for slot in funcs_in_jset]
+        # change function RVA if scanned lib is different than chosen lib
+        for i, _scanned_tup in enumerate(scanned_func):
+            scanned_lib, _func = _scanned_tup
+            if scanned_lib != chosen_lib:
+                f_rva = _impscan_obj.lookup[scanned_lib][_func]
+                chosen_func = funcs_in_jset[i][chosen_lib]
+                _impscan_obj.lookup[chosen_lib][chosen_func] = f_rva
+        # if library RVA not yet present, find smallest address
+        # from the jump addresses, then mask to make relative
+        if chosen_lib not in _impscan_obj.rva:
+            lib_jumps = _splits[j]
+            debug_print(f"lib_jumps[{j}] = "
+                        f"chosen:{chosen_lib} = "
+                        f"{lib_jumps}")
+            # mask vaddr to make it rva
+            iat_start = min(lib_jumps) & 0xFFFF
+            debug_print(f"iat_start for lib {chosen_lib} = {iat_start:x}")
+            _impscan_obj.rva[chosen_lib] = iat_start
     return _new_imports
 
 
