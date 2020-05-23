@@ -114,6 +114,10 @@ def fix_oep(_binary, oep):
 
 
 def add_new_imports(_binary, _new):
+    if _binary.optional_header.magic == lief.PE.PE_TYPE.PE32:
+        ordinal_flag = 1 << 31
+    else:
+        ordinal_flag = 1 << 63
     # copy _new since we are popping items
     _new = dict(_new)
     # first, add new functions for existing libraries
@@ -133,10 +137,19 @@ def add_new_imports(_binary, _new):
         )
         lib = _binary.add_library(lib_name)
         for new_func in _new.pop(lib_name):
-            debug_print(
-                "add_entry: lib={} func={}".format(lib_name, new_func)
-            )
-            lib.add_entry(new_func)
+            if new_func.startswith('Ordinal'):
+                hint = int(new_func[7:])
+                data = ordinal_flag + hint
+                debug_print(
+                    "add_entry: lib={} ordinal={}".format(lib_name, hint)
+                )
+                entry = lief.PE.ImportEntry(data)
+                lib.add_entry(entry)
+            else:
+                debug_print(
+                    "add_entry: lib={} func={}".format(lib_name, new_func)
+                )
+                lib.add_entry(new_func)
     if len(_new):
         print("warning: there are left over"
               " libraries after adding new imports")
@@ -318,8 +331,12 @@ def patch_iat(_bin, _impscan):
         for entry in lib.entries:
             # iat_val = int(entry.iat_value)
             iat_val = tb_val
-            debug_print(f"{lib.name}:{entry.name}:iat_value=0x{iat_val:x}")
-            vaddr = _impscan.lookup[_nc(lib.name)][entry.name]
+            if entry.is_ordinal:
+                entry_name = f'Ordinal{entry.ordinal}'
+            else:
+                entry_name = entry.name
+            debug_print(f"{lib.name}:{entry_name}:iat_value=0x{iat_val:x}")
+            vaddr = _impscan.lookup[_nc(lib.name)][entry_name]
             old_iat = _bin.get_content_from_virtual_address(vaddr, 4)
             old_iat = buf_to_uint32(old_iat)
             debug_print("vaddr=0x{:x} old_iat=0x{:x}".format(vaddr, old_iat))
